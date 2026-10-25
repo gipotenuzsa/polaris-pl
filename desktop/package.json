@@ -1,0 +1,70 @@
+{
+  "name": "polaris-desktop",
+  "productName": "Polaris",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Polaris для Windows: локальный сервер и интерфейс в одном окне",
+  "author": "Polaris contributors",
+  "license": "MIT",
+  "main": "main.mjs",
+  "type": "module",
+  "scripts": {
+    "stage": "node scripts/stage.mjs",
+    "start": "electron .",
+    "dist": "node scripts/stage.mjs && electron-builder --win --x64",
+    "dist:dir": "node scripts/stage.mjs && electron-builder --win dir --x64"
+  },
+  "build": {
+    "appId": "pl.polaris.desktop",
+    "productName": "Polaris",
+    "copyright": "MIT",
+    "directories": {
+      "output": "release",
+      "buildResources": "build"
+    },
+    "files": [
+      "main.mjs",
+      "server-host.mjs",
+      "prompt.html",
+      "prompt-preload.cjs",
+      "package.json",
+      "build/icon.png"
+    ],
+    "extraResources": [
+      {
+        "from": "app",
+        "to": "app-content"
+      }
+    ],
+    "win": {
+      "icon": "build/icon.ico",
+      "target": [
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "portable": {
+      "artifactName": "Polaris-${version}-portable.exe"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "artifactName": "Polaris-Setup-${version}.exe",
+      "shortcutName": "Polaris"
+    }
+  },
+  "devDependencies": {
+    "electron": "^45.0.0",
+    "electron-builder": "^26.18.0"
+  }
+}

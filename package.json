@@ -1,0 +1,24 @@
+{
+  "name": "polaris-pl",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Polaris — открытый self-hosted фоновый AI-агент",
+  "license": "MIT",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "install:all": "npm --prefix server install && npm --prefix client install",
+    "dev:server": "npm --prefix server run dev",
+    "dev:client": "npm --prefix client run start",
+    "build:server": "npm --prefix server run build",
+    "build:web": "node scripts/build-web.mjs",
+    "test": "npm --prefix server test",
+    "lint": "npm --prefix server run lint && npm --prefix client run lint",
+    "typecheck": "npm --prefix server run typecheck && npm --prefix client run typecheck",
+    "format": "prettier --write \"server/{src,test,scripts}/**/*.ts\" \"client/{app,src}/**/*.{ts,tsx}\"",
+    "hash-password": "npm --prefix server run hash-password --",
+    "desktop:dev": "npm --prefix desktop run stage && npm --prefix desktop run start",
+    "desktop:dist": "npm --prefix desktop run dist"
+  }
+}

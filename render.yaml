@@ -1,0 +1,37 @@
+# Blueprint для Render: «New → Blueprint» и выбрать этот репозиторий.
+# Секретные значения (sync: false) Render спросит при создании.
+services:
+  - type: web
+    name: polaris
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      # Supabase → Project Settings → Database → Connection string (Session pooler)
+      - key: DATABASE_URL
+        sync: false
+      # npm run hash-password -- "ваш пароль"
+      - key: POLARIS_PASSWORD_HASH
+        sync: false
+      - key: ENCRYPTION_KEY # шифрует OAuth-токены в базе; Render сгенерирует 256-битное значение
+        generateValue: true
+      - key: CRON_SECRET # для pg_cron → /internal/tick
+        generateValue: true
+      - key: PUBLIC_URL # https://polaris-xxxx.onrender.com (после первого деплоя)
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_KEY
+        sync: false
+      - key: OPENROUTER_API_KEY
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: BRAVE_API_KEY
+        sync: false
+      - key: INSTANCE_TIMEZONE
+        value: Asia/Almaty

@@ -1,0 +1,15 @@
+**/node_modules
+**/dist
+**/.expo
+**/data
+**/release
+.git
+.github
+.env
+.env.*
+desktop
+docs
+server/public
+server/test
+*.md
+!server/package.json

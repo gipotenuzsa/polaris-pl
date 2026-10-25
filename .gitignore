@@ -1,0 +1,17 @@
+node_modules/
+dist/
+.expo/
+web-build/
+.env
+.env.*
+!.env.example
+data/
+*.log
+.DS_Store
+ios/
+android/
+coverage/
+server/public/
+desktop/app/
+desktop/release/
+desktop/node_modules/

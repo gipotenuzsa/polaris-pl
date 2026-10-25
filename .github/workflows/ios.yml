@@ -1,0 +1,46 @@
+# Сборка iOS без подписи (.ipa). Запускается вручную: Actions → iOS (unsigned .ipa) → Run workflow.
+# Подписать бесплатным Apple ID можно в Sideloadly (Windows/macOS) или SideStore — см. README.
+name: iOS (unsigned .ipa)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: client/package-lock.json
+      - run: npm ci
+        working-directory: client
+      - name: Сгенерировать нативный проект
+        run: npx expo prebuild --platform ios --no-install
+        working-directory: client
+      - name: Pods
+        run: pod install
+        working-directory: client/ios
+      - name: Собрать без подписи
+        working-directory: client/ios
+        run: |
+          set -eo pipefail
+          WORKSPACE=$(ls -d *.xcworkspace | head -n1)
+          SCHEME="${WORKSPACE%.xcworkspace}"
+          xcodebuild -workspace "$WORKSPACE" -scheme "$SCHEME" -configuration Release \
+            -sdk iphoneos -destination 'generic/platform=iOS' -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" build
+      - name: Упаковать .ipa
+        working-directory: client/ios
+        run: |
+          set -eo pipefail
+          APP=$(find build/Build/Products/Release-iphoneos -maxdepth 1 -name '*.app' | head -n1)
+          rm -rf Payload && mkdir Payload && cp -R "$APP" Payload/
+          zip -qry Polaris-unsigned.ipa Payload
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Polaris-unsigned-ipa
+          path: client/ios/Polaris-unsigned.ipa
+          if-no-files-found: error

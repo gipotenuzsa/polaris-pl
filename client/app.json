@@ -1,0 +1,45 @@
+{
+  "expo": {
+    "name": "Polaris",
+    "slug": "polaris",
+    "scheme": "polaris",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "backgroundColor": "#0a1020",
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0a1020"
+    },
+    "ios": {
+      "bundleIdentifier": "pl.polaris.app",
+      "supportsTablet": true,
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
+    },
+    "android": {
+      "package": "pl.polaris.app",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#0a1020"
+      },
+      "softwareKeyboardLayoutMode": "resize"
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "single",
+      "favicon": "./assets/favicon.png",
+      "name": "Polaris",
+      "shortName": "Polaris",
+      "backgroundColor": "#0a1020",
+      "themeColor": "#0a1020"
+    },
+    "plugins": ["expo-router", "expo-secure-store", "expo-web-browser", "expo-font"],
+    "extra": {
+      "router": {}
+    }
+  }
+}

@@ -1,0 +1,72 @@
+import { Stack } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
+import type { ReactNode } from 'react';
+import { ActivityIndicator, StyleSheet, View } from 'react-native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { AuthProvider, useAuth } from '../src/auth';
+import { StatusProvider } from '../src/status';
+import { colors } from '../src/theme';
+
+/** Пока идёт проверка сессии, поверх навигации показываем заставку. */
+function Gate({ children }: { children: ReactNode }) {
+  const { state } = useAuth();
+  return (
+    <>
+      {children}
+      {state === 'loading' ? (
+        <View style={styles.splash}>
+          <ActivityIndicator color={colors.accent} size="large" />
+        </View>
+      ) : null}
+    </>
+  );
+}
+
+export default function RootLayout() {
+  return (
+    <SafeAreaProvider>
+      <AuthProvider>
+        <StatusProvider>
+          <StatusBar style="light" />
+          <Gate>
+            <Stack
+              screenOptions={{
+                headerStyle: { backgroundColor: colors.bg },
+                headerTintColor: colors.text,
+                headerTitleStyle: { fontWeight: '700' },
+                headerShadowVisible: false,
+                contentStyle: { backgroundColor: colors.bg },
+                headerBackTitle: 'Назад',
+              }}
+            >
+              <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+              <Stack.Screen name="login" options={{ headerShown: false }} />
+              <Stack.Screen name="chat/[id]" options={{ title: 'Чат' }} />
+              <Stack.Screen name="task/new" options={{ title: 'Новая задача', presentation: 'modal' }} />
+              <Stack.Screen name="task/[id]" options={{ title: 'Задача' }} />
+              <Stack.Screen name="settings" options={{ title: 'Настройки' }} />
+              <Stack.Screen name="journal" options={{ title: 'Журнал действий' }} />
+              <Stack.Screen name="notes" options={{ title: 'Заметки' }} />
+              <Stack.Screen name="files" options={{ title: 'Файлы' }} />
+              <Stack.Screen name="inbox" options={{ title: 'Уведомления' }} />
+            </Stack>
+          </Gate>
+        </StatusProvider>
+      </AuthProvider>
+    </SafeAreaProvider>
+  );
+}
+
+const styles = StyleSheet.create({
+  splash: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: colors.bg,
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 200,
+  },
+});
