@@ -39,6 +39,9 @@ COPY --from=server-build /app/server/dist server/dist
 COPY server/package.json server/
 COPY --from=web-build /out/web server/public
 COPY supabase/migrations supabase/migrations
+# Каталог для локальных файлов (если не подключён Supabase Storage); диск на Render бесплатном тарифе временный
+ENV DATA_DIR=/app/data
+RUN mkdir -p /app/data && chown -R node:node /app/data
 USER node
 EXPOSE 10000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=30s \
