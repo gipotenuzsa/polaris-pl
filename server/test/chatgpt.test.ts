@@ -1,8 +1,9 @@
 import { createHash } from 'node:crypto';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { isModelError } from '../src/providers/chatgpt/auth.js';
 import { buildAuthorizeUrl, extractClaims, generatePkce, parseCallbackInput } from '../src/providers/chatgpt/oauth.js';
 import { ChatGptProvider } from '../src/providers/chatgpt/provider.js';
-import { createTestEnv, type TestEnv } from './helpers.js';
+import { createTestEnv, login, type TestEnv } from './helpers.js';
 
 const b64 = (o: unknown) => Buffer.from(JSON.stringify(o)).toString('base64url');
 export const fakeJwt = (exp: number, extra: Record<string, unknown> = {}) =>
@@ -70,7 +71,10 @@ describe('OAuth ChatGPT: чистые функции', () => {
 
 describe('ChatGptAuth и провайдер', () => {
   let env: TestEnv;
-  afterEach(async () => env?.close());
+  afterEach(async () => {
+    await env?.close();
+    env = undefined as unknown as TestEnv; // тесты без окружения не должны закрывать чужое повторно
+  });
 
   async function setup(handlers: {
     token?: (body: string, init: RequestInit) => Response;
@@ -186,6 +190,113 @@ describe('ChatGptAuth и провайдер', () => {
   it('без подключения проверка честно сообщает об этом', async () => {
     await setup({});
     expect(await env.ctx.chatgpt.check()).toMatchObject({ ok: false, error: expect.stringContaining('не подключён') });
+  });
+
+  const unsupported = (model: string) =>
+    jsonRes({ detail: `The '${model}' model is not supported when using Codex with a ChatGPT account.` }, 400);
+  const tokenOk = () =>
+    jsonRes({ access_token: fakeJwt(inFuture(3600)), refresh_token: 'R', id_token: fakeJwt(inFuture(3600)) });
+
+  it('недоступная модель заменяется первой рабочей из списка и сохраняется в настройках', async () => {
+    const asked: string[] = [];
+    await setup({
+      token: tokenOk,
+      responses: (init) => {
+        const model = JSON.parse(String(init.body)).model as string;
+        asked.push(model);
+        return model === 'gpt-5-codex' ? okStream() : unsupported(model);
+      },
+    });
+    await connect();
+    const res = await env.ctx.chatgpt.check();
+    expect(res).toMatchObject({
+      ok: true,
+      model: 'gpt-5-codex',
+      switchedFrom: 'gpt-6-luna',
+      unavailable: ['gpt-6-luna', 'gpt-5.1-codex'],
+    });
+    expect(asked).toEqual(['gpt-6-luna', 'gpt-5.1-codex', 'gpt-5-codex']);
+    expect((await env.ctx.settings.getChatGpt()).model).toBe('gpt-5-codex');
+    expect((await env.ctx.chatgpt.status()).model).toBe('gpt-5-codex');
+    // повторная проверка уже идёт сразу с рабочей моделью
+    asked.length = 0;
+    expect(await env.ctx.chatgpt.check()).toMatchObject({ ok: true, model: 'gpt-5-codex' });
+    expect(asked).toEqual(['gpt-5-codex']);
+  });
+
+  it('autoSelect=false только сообщает о недоступной модели; если не подходит ни одна — понятная ошибка', async () => {
+    await setup({ token: tokenOk, responses: (init) => unsupported(JSON.parse(String(init.body)).model) });
+    await connect();
+    const strict = await env.ctx.chatgpt.check({ autoSelect: false });
+    expect(strict).toMatchObject({ ok: false, modelNotFound: true, model: 'gpt-6-luna' });
+    expect((await env.ctx.settings.getChatGpt()).model).toBe('gpt-6-luna');
+
+    const all = await env.ctx.chatgpt.check();
+    expect(all).toMatchObject({ ok: false, modelNotFound: true, model: 'gpt-6-luna' });
+    expect(all.unavailable).toEqual(['gpt-6-luna', 'gpt-5.1-codex', 'gpt-5-codex', 'gpt-5']);
+    expect(all.error).toContain('Ни одна из моделей');
+  });
+
+  it('другая ошибка (не про модель) не перебирает модели', async () => {
+    let calls = 0;
+    await setup({
+      token: tokenOk,
+      responses: () => {
+        calls++;
+        return new Response('upstream exploded', { status: 500 });
+      },
+    });
+    await connect();
+    const res = await env.ctx.chatgpt.check();
+    expect(res).toMatchObject({ ok: false, model: 'gpt-6-luna', error: expect.stringContaining('HTTP 500') });
+    expect(res.modelNotFound).toBeUndefined();
+    expect(calls).toBe(1);
+  });
+
+  it('isModelError узнаёт разные формулировки отказа по модели', () => {
+    for (const msg of [
+      'chatgpt: model_not_found — The model does not exist',
+      'chatgpt: HTTP 400 — {"detail":"The \'gpt-6-luna\' model is not supported when using Codex with a ChatGPT account."}',
+      'chatgpt: HTTP 404 — Unknown model gpt-x',
+      'chatgpt: invalid model',
+    ]) {
+      expect(isModelError(msg), msg).toBe(true);
+    }
+    for (const msg of [
+      'chatgpt: HTTP 401 — expired',
+      'chatgpt: таймаут запроса',
+      'chatgpt: HTTP 429 — usage_limit_reached',
+    ]) {
+      expect(isModelError(msg), msg).toBe(false);
+    }
+  });
+
+  it('после входа ChatGPT включается сам, если других провайдеров нет; при наличии других остаётся выключенным', async () => {
+    const { ScriptedProvider } = await import('./helpers.js');
+    const mkEnv = async (otherAvailable: boolean) => {
+      const fetchMock = vi.fn(async (input: string | URL | Request) => {
+        if (String(input).endsWith('/oauth/token')) return tokenOk();
+        throw new Error(`неожиданный запрос ${String(input)}`);
+      });
+      env = await createTestEnv({
+        fetch: fetchMock as unknown as typeof fetch,
+        providers: [new ScriptedProvider('openrouter', () => ({ content: 'ok' }), otherAvailable)],
+      });
+      const headers = await login(env.app);
+      const start = (await env.app.inject({ method: 'POST', url: '/api/providers/chatgpt/connect', headers })).json();
+      const done = await env.app.inject({
+        method: 'POST',
+        url: '/api/providers/chatgpt/callback',
+        headers,
+        payload: { url: `http://localhost:1455/auth/callback?code=C&state=${start.state}` },
+      });
+      expect(done.statusCode).toBe(200);
+      return done.json() as { connected: boolean; enabled: boolean };
+    };
+
+    expect(await mkEnv(false)).toMatchObject({ connected: true, enabled: true });
+    await env.close();
+    expect(await mkEnv(true)).toMatchObject({ connected: true, enabled: false });
   });
 
   it('истекающий токен обновляется одним запросом даже при параллельных вызовах', async () => {

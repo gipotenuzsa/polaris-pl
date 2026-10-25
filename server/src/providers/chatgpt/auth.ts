@@ -35,6 +35,17 @@ export interface ChatGptCheckResult {
   error?: string;
   /** Модель недоступна для этого способа входа (model_not_found). */
   modelNotFound?: boolean;
+  /** Модель, которая была выбрана раньше и заменена автоматически. */
+  switchedFrom?: string;
+  /** Модели, которые бэкенд отклонил. */
+  unavailable?: string[];
+}
+
+/** Бэкенд сообщает о недоступной модели по-разному: model_not_found или «The 'x' model is not supported…». */
+export function isModelError(message: string): boolean {
+  return /model_not_found|model is not supported|unsupported model|unknown model|invalid model|model .{0,60}(does not exist|not available|not supported)|модель .{0,40}недоступн/i.test(
+    message,
+  );
 }
 
 /** Хранение и обновление OAuth-токенов подписки ChatGPT. Токены лежат в БД только в зашифрованном виде. */
@@ -158,22 +169,45 @@ export class ChatGptAuth {
     await this.ctx.db.query('delete from oauth_flows where provider = $1', [PROVIDER]);
   }
 
-  /** «Проверить вход»: реальный минимальный запрос к API, а не проверка наличия токена. */
-  async check(): Promise<ChatGptCheckResult> {
+  /**
+   * «Проверить вход»: реальный минимальный запрос к API, а не проверка наличия токена.
+   * Если выбранная модель недоступна для этого способа входа, а ChatGPT — единственный провайдер,
+   * по умолчанию подбирается первая рабочая модель из списка и сохраняется в настройках.
+   */
+  async check(opts: { autoSelect?: boolean } = {}): Promise<ChatGptCheckResult> {
+    const autoSelect = opts.autoSelect ?? true;
     const settings = await this.ctx.settings.getChatGpt();
     if (!(await this.isConnected())) return { ok: false, model: settings.model, error: 'ChatGPT не подключён' };
-    try {
-      const { ChatGptProvider } = await import('./provider.js');
-      const provider = new ChatGptProvider(this.ctx);
-      await provider.chat({
+
+    const { ChatGptProvider } = await import('./provider.js');
+    const probe = (model: string) =>
+      new ChatGptProvider(this.ctx, { model }).chat({
         messages: [{ role: 'user', content: 'Reply with the single word: ok' }],
         signal: AbortSignal.timeout(45_000),
       });
-      return { ok: true, model: settings.model };
-    } catch (err) {
-      const msg = errorMessage(err);
-      return { ok: false, model: settings.model, error: msg, modelNotFound: /model_not_found/i.test(msg) };
+
+    const candidates = [settings.model, ...this.cfg.models.filter((m) => m !== settings.model)];
+    const unavailable: string[] = [];
+    for (const model of candidates) {
+      try {
+        await probe(model);
+        if (model === settings.model) return { ok: true, model };
+        await this.setModel(model);
+        return { ok: true, model, switchedFrom: settings.model, unavailable };
+      } catch (err) {
+        const msg = errorMessage(err);
+        if (!isModelError(msg)) return { ok: false, model, error: msg };
+        unavailable.push(model);
+        if (!autoSelect) return { ok: false, model, error: msg, modelNotFound: true, unavailable };
+      }
     }
+    return {
+      ok: false,
+      model: settings.model,
+      modelNotFound: true,
+      unavailable,
+      error: `Ни одна из моделей (${unavailable.join(', ')}) недоступна для этого способа входа. Укажите другую модель вручную.`,
+    };
   }
 
   async setModel(model: string): Promise<void> {

@@ -13,10 +13,14 @@ export class ChatGptProvider implements ModelProvider {
   readonly label = 'ChatGPT (OAuth)';
   private readonly sessionId = randomUUID();
 
-  constructor(private readonly ctx: AppContext) {}
+  /** opts.model — разовая подмена модели (проверка доступности), без изменения настроек. */
+  constructor(
+    private readonly ctx: AppContext,
+    private readonly opts: { model?: string } = {},
+  ) {}
 
   async currentModel(): Promise<string> {
-    return (await this.ctx.settings.getChatGpt()).model;
+    return this.opts.model ?? (await this.ctx.settings.getChatGpt()).model;
   }
 
   async isAvailable(): Promise<boolean> {

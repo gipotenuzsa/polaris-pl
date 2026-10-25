@@ -241,7 +241,9 @@ export const api = {
   chatgptConnect: () => post<{ authUrl: string; state: string; redirectUri: string }>('/api/providers/chatgpt/connect'),
   chatgptCallback: (url: string) => post<ChatGptStatus>('/api/providers/chatgpt/callback', { url }),
   chatgptCheck: () =>
-    post<{ ok: boolean; model: string; error?: string; modelNotFound?: boolean }>('/api/providers/chatgpt/check'),
+    post<{ ok: boolean; model: string; error?: string; modelNotFound?: boolean; switchedFrom?: string }>(
+      '/api/providers/chatgpt/check',
+    ),
   chatgptDisconnect: () => post<ChatGptStatus>('/api/providers/chatgpt/disconnect'),
 
   pushStatus: () => get<{ publicKey: string; subscriptions: number }>('/api/push/status'),

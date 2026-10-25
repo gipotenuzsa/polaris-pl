@@ -34,9 +34,13 @@ function ChatGptCard({ status, onChange }: { status: ChatGptStatus; onChange: ()
   const [flow, setFlow] = useState<{ authUrl: string; redirectUri: string } | null>(null);
   const [pasted, setPasted] = useState('');
   const [busy, setBusy] = useState<string | null>(null);
-  const [check, setCheck] = useState<{ ok: boolean; error?: string; modelNotFound?: boolean; model: string } | null>(
-    null,
-  );
+  const [check, setCheck] = useState<{
+    ok: boolean;
+    error?: string;
+    modelNotFound?: boolean;
+    model: string;
+    switchedFrom?: string;
+  } | null>(null);
   const [customModel, setCustomModel] = useState('');
 
   const run = async (name: string, fn: () => Promise<void>) => {
@@ -63,12 +67,13 @@ function ChatGptCard({ status, onChange }: { status: ChatGptStatus; onChange: ()
         <Text style={{ color: colors.warn, fontSize: 13, lineHeight: 19 }}>
           Только для личного использования на своей подписке ChatGPT Plus/Pro. Это неофициальный способ доступа: условия
           OpenAI могут его ограничивать, а интерфейс — меняться без предупреждения. Одна подписка на инстанс. Провайдер
-          всегда стоит последним в цепочке и подключается, только когда остальные не ответили.
+          всегда стоит последним в цепочке: он отвечает, когда остальные провайдеры не ответили, а если других ключей
+          нет — работает единственным.
         </Text>
       </View>
 
       <Toggle
-        label="Использовать как запасной провайдер"
+        label="Использовать ChatGPT как провайдер"
         value={status.enabled}
         onChange={(v) =>
           run('enable', async () => {
@@ -187,9 +192,11 @@ function ChatGptCard({ status, onChange }: { status: ChatGptStatus; onChange: ()
         <View style={{ marginTop: space.sm }}>
           <Text style={{ color: check.ok ? colors.success : colors.danger, fontSize: 14, lineHeight: 20 }} selectable>
             {check.ok
-              ? `✓ Вход работает, модель ${check.model} отвечает.`
+              ? check.switchedFrom
+                ? `✓ Вход работает. Модель ${check.switchedFrom} недоступна для этого способа входа — выбрана ${check.model}, она отвечает.`
+                : `✓ Вход работает, модель ${check.model} отвечает.`
               : check.modelNotFound
-                ? `✕ Модель ${check.model} недоступна для этого способа входа (model_not_found). Выберите другую модель ниже.`
+                ? `✕ ${check.error ?? `Модель ${check.model} недоступна для этого способа входа.`} Выберите другую модель ниже.`
                 : `✕ ${check.error ?? 'Проверка не прошла'}`}
           </Text>
         </View>
