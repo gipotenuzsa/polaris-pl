@@ -5,6 +5,7 @@ import { KeyboardAvoidingView, Linking, Platform, RefreshControl, ScrollView, Te
 import { api } from '../src/api';
 import { formatNumber } from '../src/format';
 import { useLoad } from '../src/hooks';
+import { disablePush, enablePush, pushState } from '../src/push';
 import { colors, space } from '../src/theme';
 import type { BudgetLimits, BudgetSummary, ChatGptStatus, MorningSettings } from '../src/types';
 import {
@@ -422,6 +423,96 @@ function MorningCard() {
   );
 }
 
+// ── Push-уведомления на телефон (PWA) ──────────────────────────────────────────
+
+function PushCard() {
+  const { data: state, refresh } = useLoad(() => pushState());
+  const [busy, setBusy] = useState<string | null>(null);
+  const [result, setResult] = useState<string | null>(null);
+
+  const run = async (name: string, fn: () => Promise<void>) => {
+    setBusy(name);
+    setResult(null);
+    try {
+      await fn();
+      await refresh();
+    } catch (e) {
+      setResult(errText(e));
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  return (
+    <Card>
+      <Row style={{ justifyContent: 'space-between', marginBottom: space.sm }}>
+        <Text style={{ color: colors.text, fontWeight: '700', fontSize: 16 }}>Уведомления на телефон</Text>
+        {state === 'on' ? <Badge label="Включены" color={colors.success} /> : null}
+      </Row>
+      {state === 'unsupported' ? (
+        <Muted>
+          Этот браузер или окно не поддерживает push-уведомления. На iPhone откройте Polaris из иконки на экране
+          «Домой», на Android — в Chrome.
+        </Muted>
+      ) : null}
+      {state === 'needs-install' ? (
+        <Body>
+          На iPhone push работает только у приложения с экрана «Домой» (iOS 16.4 и новее): в Safari нажмите «Поделиться»
+          → «На экран „Домой“», откройте Polaris с новой иконки и вернитесь в эти настройки.
+        </Body>
+      ) : null}
+      {state === 'denied' ? (
+        <Body>
+          Уведомления запрещены. Разрешите их: на iPhone — Настройки → Уведомления → Polaris; в браузере — настройки
+          сайта. Потом вернитесь сюда.
+        </Body>
+      ) : null}
+      {state === 'off' ? (
+        <>
+          <Muted style={{ marginBottom: space.md }}>
+            Результаты задач, напоминания, запросы подтверждения и ответы агента будут приходить на экран блокировки,
+            даже когда приложение закрыто.
+          </Muted>
+          <Button
+            title="Включить уведомления"
+            icon="notifications-outline"
+            loading={busy === 'on'}
+            onPress={() => run('on', enablePush)}
+          />
+        </>
+      ) : null}
+      {state === 'on' ? (
+        <Row style={{ flexWrap: 'wrap' }}>
+          <Button
+            title="Отправить тест"
+            icon="paper-plane-outline"
+            loading={busy === 'test'}
+            onPress={() =>
+              run('test', async () => {
+                const r = await api.pushTest();
+                setResult(
+                  r.sent > 0
+                    ? `Отправлено устройствам: ${r.sent}. Уведомление придёт через пару секунд.`
+                    : 'Не удалось доставить — попробуйте выключить и включить снова.',
+                );
+              })
+            }
+            style={{ marginRight: space.sm, marginBottom: space.sm }}
+          />
+          <Button
+            title="Выключить"
+            variant="secondary"
+            loading={busy === 'off'}
+            onPress={() => run('off', disablePush)}
+            style={{ marginBottom: space.sm }}
+          />
+        </Row>
+      ) : null}
+      {result ? <Muted style={{ marginTop: space.sm }}>{result}</Muted> : null}
+    </Card>
+  );
+}
+
 export default function Settings() {
   const { data, error, loading, refresh } = useLoad(() => api.providers());
 
@@ -435,6 +526,13 @@ export default function Settings() {
         >
           <ErrorNote message={error} onRetry={refresh} />
           {loading && !data ? <Loading /> : null}
+
+          {Platform.OS === 'web' ? (
+            <>
+              <SectionTitle>Уведомления</SectionTitle>
+              <PushCard />
+            </>
+          ) : null}
 
           <SectionTitle>Провайдеры моделей (по порядку)</SectionTitle>
           {data?.providers.map((p, i) => (

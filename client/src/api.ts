@@ -243,4 +243,11 @@ export const api = {
   chatgptCheck: () =>
     post<{ ok: boolean; model: string; error?: string; modelNotFound?: boolean }>('/api/providers/chatgpt/check'),
   chatgptDisconnect: () => post<ChatGptStatus>('/api/providers/chatgpt/disconnect'),
+
+  pushStatus: () => get<{ publicKey: string; subscriptions: number }>('/api/push/status'),
+  pushSubscribe: (sub: { endpoint: string; keys: { p256dh: string; auth: string } }) =>
+    post<{ ok: true; subscriptions: number }>('/api/push/subscribe', sub),
+  pushUnsubscribe: (endpoint: string) =>
+    post<{ ok: true; subscriptions: number }>('/api/push/unsubscribe', { endpoint }),
+  pushTest: () => post<{ sent: number; removed: number; failed: number }>('/api/push/test'),
 };

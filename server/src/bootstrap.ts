@@ -18,6 +18,7 @@ import { MemoryService } from './services/memory.js';
 import { MorningService } from './services/morning.js';
 import { NotesService, RemindersService } from './services/notes.js';
 import { NotificationsService } from './services/notifications.js';
+import { PushService, type PushSender } from './services/push.js';
 import { RunManager } from './services/runs.js';
 import { Scheduler } from './services/scheduler.js';
 import { SettingsService } from './services/settings.js';
@@ -44,6 +45,8 @@ export interface BootstrapOptions {
   /** Подмена провайдеров (тесты). */
   providers?: ModelProvider[];
   files?: FileStore;
+  /** Подмена отправителя Web Push (тесты). */
+  pushSender?: PushSender;
   /** Дополнительные инструменты (тесты, расширения). */
   extraTools?: AnyTool[];
 }
@@ -115,6 +118,7 @@ export async function createContext(opts: BootstrapOptions): Promise<AppContext>
   ctx.notes = new NotesService(ctx);
   ctx.reminders = new RemindersService(ctx);
   ctx.notifications = new NotificationsService(ctx);
+  ctx.push = new PushService(ctx, opts.pushSender);
   ctx.conversations = new ConversationService(ctx);
   ctx.runs = new RunManager(ctx);
   ctx.tasks = new TaskService(ctx);

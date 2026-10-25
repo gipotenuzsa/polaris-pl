@@ -13,6 +13,18 @@ export class RunManager {
     return this.active.has(conversationId);
   }
 
+  private readonly viewed = new Map<string, number>();
+
+  /** Клиент только что запрашивал этот диалог — значит, пользователь смотрит на экран. */
+  touchViewed(conversationId: string): void {
+    this.viewed.set(conversationId, this.ctx.clock().getTime());
+  }
+
+  isBeingViewed(conversationId: string, withinMs = 20_000): boolean {
+    const at = this.viewed.get(conversationId);
+    return at !== undefined && this.ctx.clock().getTime() - at < withinMs;
+  }
+
   activeCount(): number {
     return this.active.size;
   }
@@ -50,11 +62,22 @@ export class RunManager {
     const lastUser = [...rows].reverse().find((r) => r.role === 'user');
     const system = await buildSystemPrompt(app, { mode: 'chat', query: lastUser?.content });
     try {
-      return await runAgent(app, {
+      const outcome = await runAgent(app, {
         conversationId,
         system,
         since: lastUser ? new Date(lastUser.created_at) : app.clock(),
       });
+      // Ответ готов, а пользователь ушёл из приложения: сообщение приходит на телефон, как в мессенджере.
+      // (Запросы на подтверждение отправляются отдельным уведомлением.)
+      if (outcome.status === 'done' && outcome.text.trim() && !this.isBeingViewed(conversationId)) {
+        app.push.notify({
+          title: 'Polaris',
+          body: outcome.text.replace(/\s+/g, ' ').trim(),
+          url: `/chat/${conversationId}`,
+          tag: `chat-${conversationId}`,
+        });
+      }
+      return outcome;
     } catch (err) {
       const message = errorMessage(err);
       app.log.error({ err: message, conversationId }, 'Сбой чата');

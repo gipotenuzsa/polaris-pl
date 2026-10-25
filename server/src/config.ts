@@ -37,6 +37,7 @@ const envSchema = z.object({
   CRON_SECRET: optStr,
   ALLOW_PRIVATE_NETWORK: bool(false),
   CORS_ORIGINS: optStr,
+  VAPID_SUBJECT: optStr,
 
   SUPABASE_URL: optStr,
   SUPABASE_SERVICE_KEY: optStr,
@@ -121,6 +122,8 @@ export interface Config {
   cronSecret?: string;
   /** Origin'ы, которым разрешены кросс-доменные запросы (веб-клиент в режиме разработки на другом порту). */
   corsOrigins: string[];
+  /** Контакт отправителя Web Push (mailto: или https://); по умолчанию PUBLIC_URL. */
+  vapidSubject?: string;
   allowPrivateNetwork: boolean;
   supabase: { url?: string; serviceKey?: string; bucket: string };
   localFilesDir?: string;
@@ -211,6 +214,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     sessionTtlDays: e.SESSION_TTL_DAYS,
     cookieSecure: isProd && (e.PUBLIC_URL ? e.PUBLIC_URL.startsWith('https://') : true),
     cronSecret: e.CRON_SECRET,
+    vapidSubject: e.VAPID_SUBJECT,
     corsOrigins: (e.CORS_ORIGINS ?? '')
       .split(',')
       .map((s) => s.trim().replace(/\/+$/, ''))

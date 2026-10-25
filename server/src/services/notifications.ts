@@ -1,5 +1,6 @@
 import type { AppContext } from '../context.js';
 import { json } from '../db/types.js';
+import { urlForNotification } from './push.js';
 
 export type NotificationKind = 'reminder' | 'task_done' | 'task_failed' | 'approval' | 'morning' | 'info';
 
@@ -47,7 +48,16 @@ export class NotificationsService {
       'insert into notifications (kind, title, body, ref) values ($1, $2, $3, $4::jsonb) returning *',
       [n.kind, n.title.slice(0, 200), (n.body ?? '').slice(0, 4000), json(n.ref)],
     );
-    return toDto(rows[0]!);
+    const dto = toDto(rows[0]!);
+    // То же событие уходит на телефон как Web Push (если устройство подписано)
+    this.ctx.push.notify({
+      title: dto.title,
+      body: dto.body,
+      url: urlForNotification(dto.kind, dto.ref as { conversationId?: string; taskId?: string } | undefined),
+      tag: dto.id,
+      urgent: dto.kind === 'approval' || dto.kind === 'reminder',
+    });
+    return dto;
   }
 
   async list(opts: { unreadOnly?: boolean; limit?: number } = {}): Promise<NotificationDto[]> {

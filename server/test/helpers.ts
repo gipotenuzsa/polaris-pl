@@ -10,6 +10,7 @@ import type { AppContext } from '../src/context.js';
 import { createDb, createMemoryDb } from '../src/db/index.js';
 import type { Db } from '../src/db/types.js';
 import type { ChatRequest, ChatResponse, ModelProvider, ProviderId, ToolCall } from '../src/providers/types.js';
+import type { PushSender } from '../src/services/push.js';
 import { LocalFileStore } from '../src/storage/local.js';
 import type { AnyTool } from '../src/tools/types.js';
 
@@ -94,6 +95,7 @@ export async function createTestEnv(
     extraTools?: AnyTool[];
     providers?: ModelProvider[];
     fetch?: typeof fetch;
+    pushSender?: PushSender;
   } = {},
 ): Promise<TestEnv> {
   const config = testConfig(opts.config);
@@ -105,6 +107,7 @@ export async function createTestEnv(
     db,
     clock: opts.clock,
     fetch: opts.fetch,
+    pushSender: opts.pushSender,
     providers: opts.providers ?? [provider],
     files: new LocalFileStore(dir),
     extraTools: opts.extraTools,

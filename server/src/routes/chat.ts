@@ -22,6 +22,7 @@ export function chatRoutes(app: FastifyInstance, ctx: AppContext): void {
     const { id } = parse(idParams, req.params);
     const { after } = parse(z.object({ after: z.coerce.number().int().min(0).default(0) }), req.query);
     const conversation = await ctx.conversations.get(id);
+    ctx.runs.touchViewed(id);
     const rows = await ctx.conversations.messages(id, after);
     return {
       conversation,
@@ -56,6 +57,7 @@ export function chatRoutes(app: FastifyInstance, ctx: AppContext): void {
     }
     const message = await ctx.conversations.add({ conversationId: id, role: 'user', content });
     if (conv.title === 'Новый чат') await ctx.conversations.rename(id, content.replace(/\s+/g, ' ').slice(0, 60));
+    ctx.runs.touchViewed(id);
     ctx.runs.startChat(id);
     reply.code(202);
     return { message: toMessageDto(message), running: true };

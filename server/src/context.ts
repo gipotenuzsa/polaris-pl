@@ -10,6 +10,7 @@ import type { MemoryService } from './services/memory.js';
 import type { MorningService } from './services/morning.js';
 import type { NotesService, RemindersService } from './services/notes.js';
 import type { NotificationsService } from './services/notifications.js';
+import type { PushService } from './services/push.js';
 import type { RunManager } from './services/runs.js';
 import type { Scheduler } from './services/scheduler.js';
 import type { SettingsService } from './services/settings.js';
@@ -41,6 +42,7 @@ export interface AppContext {
   notes: NotesService;
   reminders: RemindersService;
   notifications: NotificationsService;
+  push: PushService;
   conversations: ConversationService;
   runs: RunManager;
   tasks: TaskService;

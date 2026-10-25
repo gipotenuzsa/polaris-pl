@@ -1,9 +1,10 @@
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import type { ReactNode } from 'react';
+import { useEffect, type ReactNode } from 'react';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AuthProvider, useAuth } from '../src/auth';
+import { registerServiceWorker } from '../src/push';
 import { StatusProvider } from '../src/status';
 import { colors } from '../src/theme';
 
@@ -23,6 +24,9 @@ function Gate({ children }: { children: ReactNode }) {
 }
 
 export default function RootLayout() {
+  useEffect(() => {
+    registerServiceWorker(); // нужен для Web Push; на нативных платформах ничего не делает
+  }, []);
   return (
     <SafeAreaProvider>
       <AuthProvider>
