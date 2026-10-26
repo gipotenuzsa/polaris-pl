@@ -24,6 +24,10 @@ export interface RunOptions {
   budget?: { maxTokens?: number; maxUsd?: number };
   signal?: AbortSignal;
   hooks?: RunHooks;
+  /** Текст ответа модели по мере генерации (стриминг в чат). */
+  onText?: (delta: string) => void;
+  /** Вызывается, когда ответ модели сохранён или попытка закончилась — буфер стриминга можно сбросить. */
+  onTextReset?: () => void;
   toolFilter?: (tool: AnyTool) => boolean;
 }
 
@@ -60,7 +64,10 @@ export async function runAgent(app: AppContext, opts: RunOptions): Promise<RunOu
   await app.conversations.repairDanglingToolCalls(conversationId);
 
   for (let step = 0; step < maxSteps; step++) {
-    if (opts.signal?.aborted) return { status: 'failed', error: 'Остановлено' };
+    if (opts.signal?.aborted) {
+      if (step > 0) await say('⏹ Остановлено.');
+      return { status: 'failed', error: 'Остановлено' };
+    }
 
     const rows = await app.conversations.messages(conversationId, 0, 400);
     const pending = rows.filter((r) => r.role === 'tool' && r.status === 'pending');
@@ -95,8 +102,14 @@ export async function runAgent(app: AppContext, opts: RunOptions): Promise<RunOu
         tools: specs,
         maxTokens: Math.min(MAX_OUTPUT_TOKENS, remaining ?? MAX_OUTPUT_TOKENS),
         signal: opts.signal,
+        onText: opts.onText,
       });
     } catch (err) {
+      opts.onTextReset?.();
+      if (opts.signal?.aborted) {
+        await say('⏹ Остановлено.');
+        return { status: 'failed', error: 'Остановлено' };
+      }
       const message = err instanceof AllProvidersFailedError ? err.message : errorMessage(err);
       await say(`⚠️ Не удалось получить ответ модели. ${message}`);
       return { status: 'failed', error: message };
@@ -111,6 +124,7 @@ export async function runAgent(app: AppContext, opts: RunOptions): Promise<RunOu
       provider: resp.provider,
       model: resp.model,
     });
+    opts.onTextReset?.();
     await opts.hooks?.onModel?.(resp);
 
     if (resp.toolCalls.length === 0) return { status: 'done', text: resp.content };

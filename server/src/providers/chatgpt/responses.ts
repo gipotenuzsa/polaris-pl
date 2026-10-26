@@ -81,6 +81,7 @@ interface ResponsesEvent {
 export async function collectResponse(
   events: AsyncIterable<SseEvent>,
   fallbackModel: string,
+  onText?: (delta: string) => void,
 ): Promise<Omit<ChatResponse, 'provider'>> {
   let deltaText = '';
   let itemText = '';
@@ -101,6 +102,7 @@ export async function collectResponse(
     switch (type) {
       case 'response.output_text.delta':
         deltaText += json.delta ?? '';
+        if (json.delta) onText?.(json.delta);
         break;
       case 'response.output_item.done': {
         const item = json.item;
@@ -153,7 +155,7 @@ function ProviderErrorFromBody(code?: string, message?: string): ProviderError {
   return new ProviderError('chatgpt', 'bad_request', text);
 }
 
-export async function readResponsesBody(res: Response, fallbackModel: string) {
+export async function readResponsesBody(res: Response, fallbackModel: string, onText?: (delta: string) => void) {
   if (!res.body) throw new ProviderError('chatgpt', 'network', 'chatgpt: пустое тело ответа');
-  return collectResponse(parseSse(res.body), fallbackModel);
+  return collectResponse(parseSse(res.body), fallbackModel, onText);
 }

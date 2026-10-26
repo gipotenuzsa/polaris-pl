@@ -28,8 +28,15 @@ export function chatRoutes(app: FastifyInstance, ctx: AppContext): void {
       conversation,
       messages: rows.map(toMessageDto),
       running: ctx.runs.isRunning(id),
+      live: ctx.runs.isRunning(id) ? ctx.runs.liveText(id) : '',
       pendingApprovals: (await ctx.approvals.list('pending')).filter((a) => a.conversationId === id),
     };
+  });
+
+  app.post('/api/conversations/:id/stop', async (req) => {
+    const { id } = parse(idParams, req.params);
+    await ctx.conversations.get(id);
+    return { stopped: ctx.runs.stop(id) };
   });
 
   app.patch('/api/conversations/:id', async (req) => {

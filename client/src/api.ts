@@ -181,11 +181,19 @@ export const api = {
     get<{ conversations: Conversation[] }>(`/api/conversations${q({ kind })}`),
   createConversation: () => post<{ conversation: Conversation }>('/api/conversations'),
   conversation: (id: string, after = 0) =>
-    get<{ conversation: Conversation; messages: Message[]; running: boolean; pendingApprovals: Approval[] }>(
+    get<{
+      conversation: Conversation;
+      messages: Message[];
+      running: boolean;
+      /** Текст ответа, который модель пишет прямо сейчас (стриминг) */
+      live: string;
+      pendingApprovals: Approval[];
+    }>(
       `/api/conversations/${id}${q({ after })}`,
     ),
   renameConversation: (id: string, title: string) => patch<{ ok: true }>(`/api/conversations/${id}`, { title }),
   deleteConversation: (id: string) => del<{ ok: true }>(`/api/conversations/${id}`),
+  stopConversation: (id: string) => post<{ stopped: boolean }>(`/api/conversations/${id}/stop`),
   sendMessage: (id: string, content: string) =>
     post<{ message: Message; running: boolean }>(`/api/conversations/${id}/messages`, { content }),
 

@@ -14,6 +14,21 @@ export class RunManager {
   }
 
   private readonly viewed = new Map<string, number>();
+  /** Текст ответа, который модель пишет прямо сейчас (стриминг): клиент подхватывает его при опросе. */
+  private readonly live = new Map<string, string>();
+  private readonly aborts = new Map<string, AbortController>();
+
+  liveText(conversationId: string): string {
+    return this.live.get(conversationId) ?? '';
+  }
+
+  /** Просит остановить текущий прогон; false — в этом диалоге ничего не идёт. */
+  stop(conversationId: string): boolean {
+    const ctrl = this.aborts.get(conversationId);
+    if (!ctrl) return false;
+    ctrl.abort();
+    return true;
+  }
 
   /** Клиент только что запрашивал этот диалог — значит, пользователь смотрит на экран. */
   touchViewed(conversationId: string): void {
@@ -53,10 +68,22 @@ export class RunManager {
   }
 
   startChat(conversationId: string): boolean {
-    return this.start(conversationId, () => this.runChat(conversationId)) !== null;
+    const ctrl = new AbortController();
+    this.aborts.set(conversationId, ctrl);
+    const started = this.start(conversationId, () => this.runChat(conversationId, ctrl.signal));
+    if (!started) {
+      this.aborts.delete(conversationId);
+      return false;
+    }
+    const cleanup = () => {
+      if (this.aborts.get(conversationId) === ctrl) this.aborts.delete(conversationId);
+      this.live.delete(conversationId);
+    };
+    started.then(cleanup, cleanup);
+    return true;
   }
 
-  async runChat(conversationId: string): Promise<RunOutcome> {
+  async runChat(conversationId: string, signal?: AbortSignal): Promise<RunOutcome> {
     const app = this.ctx;
     const rows = await app.conversations.messages(conversationId, 0, 400);
     const lastUser = [...rows].reverse().find((r) => r.role === 'user');
@@ -66,6 +93,9 @@ export class RunManager {
         conversationId,
         system,
         since: lastUser ? new Date(lastUser.created_at) : app.clock(),
+        signal,
+        onText: (delta) => this.live.set(conversationId, (this.live.get(conversationId) ?? '') + delta),
+        onTextReset: () => this.live.delete(conversationId),
       });
       // Ответ готов, а пользователь ушёл из приложения: сообщение приходит на телефон, как в мессенджере.
       // (Запросы на подтверждение отправляются отдельным уведомлением.)

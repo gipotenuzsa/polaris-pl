@@ -32,6 +32,8 @@ export interface ChatRequest {
   tools?: ToolSpec[];
   maxTokens?: number;
   signal?: AbortSignal;
+  /** Вызывается по мере поступления текста ответа (стриминг). Необязателен; провайдер без стриминга его не зовёт. */
+  onText?: (delta: string) => void;
 }
 
 export interface ChatResponse {

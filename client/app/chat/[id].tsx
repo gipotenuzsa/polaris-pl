@@ -125,7 +125,27 @@ function Bubble({ m }: { m: Message }) {
   );
 }
 
-function SendButton({ enabled, onPress }: { enabled: boolean; onPress: () => void }) {
+/** Плавно «допечатывает» текст до целевого: куски со стриминга приходят пачками, а глаз видит ровный поток. */
+function useSmoothText(target: string): string {
+  const [shown, setShown] = useState(0);
+  useEffect(() => {
+    if (shown === target.length) return;
+    const next = shown > target.length ? target.length : Math.min(target.length, shown + Math.max(1, Math.ceil((target.length - shown) / 8)));
+    const t = setTimeout(() => setShown(next), shown > target.length ? 0 : 24);
+    return () => clearTimeout(t);
+  }, [target, shown]);
+  return target.slice(0, Math.min(shown, target.length));
+}
+
+function SendButton({
+  enabled,
+  running,
+  onPress,
+}: {
+  enabled: boolean;
+  running: boolean;
+  onPress: () => void;
+}) {
   const [v] = useState(() => new Animated.Value(enabled ? 1 : 0));
   useEffect(() => {
     Animated.spring(v, {
@@ -137,8 +157,8 @@ function SendButton({ enabled, onPress }: { enabled: boolean; onPress: () => voi
   }, [enabled, v]);
   return (
     <PressScale
-      onPress={enabled ? onPress : undefined}
-      accessibilityLabel="Отправить"
+      onPress={enabled || running ? onPress : undefined}
+      accessibilityLabel={running ? 'Остановить' : 'Отправить'}
       scale={0.9}
       style={{
         width: 38,
@@ -146,11 +166,15 @@ function SendButton({ enabled, onPress }: { enabled: boolean; onPress: () => voi
         borderRadius: 19,
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: enabled ? colors.ink : colors.surface2,
+        backgroundColor: enabled || running ? colors.ink : colors.surface2,
       }}
     >
       <Animated.View style={{ transform: [{ translateY: v.interpolate({ inputRange: [0, 1], outputRange: [2, 0] }) }] }}>
-        <Ionicons name="arrow-up" size={20} color={enabled ? colors.accentText : colors.muted} />
+        {running ? (
+          <View style={{ width: 12, height: 12, borderRadius: 3, backgroundColor: colors.accentText }} />
+        ) : (
+          <Ionicons name="arrow-up" size={20} color={enabled ? colors.accentText : colors.muted} />
+        )}
       </Animated.View>
     </PressScale>
   );
@@ -167,7 +191,7 @@ export default function ChatScreen() {
   const { data, error, loading, refresh } = useLoad(
     () => api.conversation(id),
     // пока агент работает — опрашиваем часто, пока ждём подтверждения — реже
-    (d) => (d?.running ? 1200 : d && d.pendingApprovals.length > 0 ? 4000 : undefined),
+    (d) => (d?.running ? 400 : d && d.pendingApprovals.length > 0 ? 4000 : undefined),
     [id],
   );
 
@@ -176,6 +200,16 @@ export default function ChatScreen() {
   const running = data?.running ?? false;
   const blocked = (data?.pendingApprovals.length ?? 0) > 0;
   const canSend = !!text.trim() && !sending && !running && !blocked;
+  const liveText = useSmoothText(running ? (data?.live ?? '') : '');
+
+  const stop = async () => {
+    try {
+      await api.stopConversation(id);
+      await refresh();
+    } catch (e) {
+      notify('Не удалось остановить', e instanceof Error ? e.message : String(e));
+    }
+  };
 
   // Что агент делает прямо сейчас — по последнему вызову инструмента.
   let doing = 'Думаю';
@@ -194,6 +228,10 @@ export default function ChatScreen() {
       setTimeout(() => list.current?.scrollToEnd({ animated: true }), 60);
     }
   }, [messages.length]);
+
+  useEffect(() => {
+    if (liveText) list.current?.scrollToEnd({ animated: false });
+  }, [liveText]);
 
   const send = async (override?: string) => {
     const content = (override ?? text).trim();
@@ -281,10 +319,15 @@ export default function ChatScreen() {
           }
           ListFooterComponent={
             running ? (
-              <FadeIn distance={4} style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: space.md }}>
-                <TypingDots />
-                <Text style={{ color: colors.muted, marginLeft: space.sm, fontSize: 14 }}>{doing}…</Text>
-              </FadeIn>
+              <View style={{ paddingVertical: space.sm }}>
+                {liveText ? <Markdown text={liveText} /> : null}
+                <FadeIn distance={4} style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: space.sm }}>
+                  <TypingDots />
+                  {liveText ? null : (
+                    <Text style={{ color: colors.muted, marginLeft: space.sm, fontSize: 14 }}>{doing}…</Text>
+                  )}
+                </FadeIn>
+              </View>
             ) : undefined
           }
         />
@@ -340,7 +383,7 @@ export default function ChatScreen() {
                 Platform.OS === 'web' ? ({ outlineStyle: 'none' } as object) : null,
               ]}
             />
-            <SendButton enabled={canSend} onPress={() => void send()} />
+            <SendButton enabled={canSend} running={running} onPress={() => (running ? void stop() : void send())} />
           </View>
         </View>
       </KeyboardAvoidingView>

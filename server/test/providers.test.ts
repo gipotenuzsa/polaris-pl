@@ -347,6 +347,25 @@ describe('SSE и ответ Responses API (ChatGPT)', () => {
 
   const sse = (events: unknown[]) => events.map((e) => `data: ${JSON.stringify(e)}\n\n`);
 
+  it('отдаёт дельты текста в onText по мере поступления', async () => {
+    const seen: string[] = [];
+    const out = await collectResponse(
+      parseSse(
+        stream(
+          sse([
+            { type: 'response.output_text.delta', delta: 'При' },
+            { type: 'response.output_text.delta', delta: 'вет' },
+            { type: 'response.completed', response: { model: 'gpt-x', usage: { input_tokens: 1, output_tokens: 1 } } },
+          ]),
+        ),
+      ),
+      'gpt-x',
+      (d) => seen.push(d),
+    );
+    expect(seen).toEqual(['При', 'вет']);
+    expect(out.content).toBe('Привет');
+  });
+
   it('собирает текст, вызов функции и usage', async () => {
     const out = await collectResponse(
       parseSse(

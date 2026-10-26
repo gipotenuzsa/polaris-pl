@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { createTestEnv, login, TEST_PASSWORD, toolCall, type TestEnv } from './helpers.js';
+import type { ChatRequest, ChatResponse, ModelProvider } from '../src/providers/types.js';
+import { createTestEnv, login, TEST_PASSWORD, toolCall, waitFor, type TestEnv } from './helpers.js';
 
 let env: TestEnv;
 afterEach(async () => env?.close());
@@ -573,5 +574,77 @@ describe('бюджет', () => {
     const budget = (await env.app.inject({ url: '/api/budget', headers: h })).json();
     expect(budget.daily.usd).toBeCloseTo(0.6);
     expect(budget.byProvider[0]).toMatchObject({ provider: 'openrouter', calls: 1 });
+  });
+});
+
+describe('стриминг и остановка ответа', () => {
+  /** Провайдер, который отдаёт текст кусками и ждёт сигнала (или остановки), прежде чем завершить ответ. */
+  class StreamingProvider implements ModelProvider {
+    readonly id = 'chatgpt' as const;
+    readonly label = 'stream';
+    release!: () => void;
+    private gate = new Promise<void>((r) => (this.release = r));
+    currentModel = () => 'stream-model';
+    isAvailable = () => true;
+    async chat(req: ChatRequest): Promise<ChatResponse> {
+      req.onText?.('При');
+      req.onText?.('вет');
+      await new Promise<void>((resolve, reject) => {
+        void this.gate.then(resolve);
+        req.signal?.addEventListener('abort', () => reject(new Error('aborted')));
+      });
+      return {
+        content: 'Привет!',
+        toolCalls: [],
+        usage: { promptTokens: 1, completionTokens: 1 },
+        provider: 'chatgpt',
+        model: 'stream-model',
+      };
+    }
+  }
+
+  const start = async (provider: StreamingProvider) => {
+    env = await createTestEnv({ providers: [provider] });
+    const h = await login(env.app);
+    const { conversation } = (
+      await env.app.inject({ method: 'POST', url: '/api/conversations', headers: h, payload: {} })
+    ).json();
+    await env.app.inject({
+      method: 'POST',
+      url: `/api/conversations/${conversation.id}/messages`,
+      headers: h,
+      payload: { content: 'привет' },
+    });
+    const get = async () => (await env.app.inject({ url: `/api/conversations/${conversation.id}`, headers: h })).json();
+    return { h, id: conversation.id as string, get };
+  };
+
+  it('пока модель отвечает, клиент видит накопленный текст в поле live; после ответа он пуст', async () => {
+    const provider = new StreamingProvider();
+    const { get } = await start(provider);
+    const mid = await waitFor(async () => {
+      const d = await get();
+      return d.live ? d : false;
+    });
+    expect(mid).toMatchObject({ running: true, live: 'Привет' });
+    provider.release();
+    await env.ctx.runs.idle();
+    const done = await get();
+    expect(done.live).toBe('');
+    expect(done.messages.at(-1)).toMatchObject({ role: 'assistant', content: 'Привет!' });
+  });
+
+  it('«Стоп» прерывает ответ и оставляет заметку об остановке', async () => {
+    const provider = new StreamingProvider();
+    const { h, id, get } = await start(provider);
+    await waitFor(async () => (await get()).live);
+    const res = await env.app.inject({ method: 'POST', url: `/api/conversations/${id}/stop`, headers: h });
+    expect(res.json()).toEqual({ stopped: true });
+    await env.ctx.runs.idle();
+    const after = await get();
+    expect(after.running).toBe(false);
+    expect(after.messages.at(-1).content).toContain('Остановлено');
+    const again = await env.app.inject({ method: 'POST', url: `/api/conversations/${id}/stop`, headers: h });
+    expect(again.json()).toEqual({ stopped: false });
   });
 });

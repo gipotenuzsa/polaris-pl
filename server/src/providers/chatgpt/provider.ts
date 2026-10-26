@@ -64,7 +64,7 @@ export class ChatGptProvider implements ModelProvider {
     }
 
     try {
-      const out = await readResponsesBody(res, model);
+      const out = await readResponsesBody(res, model, req.onText);
       return { ...out, provider: 'chatgpt' };
     } catch (err) {
       if (err instanceof ProviderError) throw err;
