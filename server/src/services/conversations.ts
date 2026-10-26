@@ -11,6 +11,11 @@ interface ConversationRow {
   id: string;
   title: string;
   kind: ConversationKind;
+  pinned: boolean;
+  is_main: boolean;
+  summary: string;
+  summary_upto: number;
+  preview?: string | null;
   created_at: Date;
   updated_at: Date;
 }
@@ -35,6 +40,11 @@ export interface ConversationDto {
   id: string;
   title: string;
   kind: ConversationKind;
+  pinned: boolean;
+  /** Единый сквозной разговор (главный экран) */
+  isMain: boolean;
+  /** Начало последнего сообщения — для списка чатов */
+  preview?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -70,6 +80,9 @@ export const toConversationDto = (r: ConversationRow): ConversationDto => ({
   id: r.id,
   title: r.title,
   kind: r.kind,
+  pinned: r.pinned,
+  isMain: r.is_main,
+  preview: r.preview?.trim() || undefined,
   createdAt: iso(r.created_at),
   updatedAt: iso(r.updated_at),
 });
@@ -104,7 +117,9 @@ export function rowsToChat(
       const skipped = images ? [] : (att.meta?.get(r.id) ?? []);
       const note = skipped.length ? `\n[Прикреплено изображение: ${skipped.map((a) => a.name).join(', ')}]` : '';
       out.push({ role: 'user', content: r.content + note, ...(images?.length ? { images } : {}) });
-    } else if (r.role === 'system') out.push({ role: 'system', content: r.content });
+    } else if (r.role === 'system') {
+      if (r.tool_name !== 'compaction') out.push({ role: 'system', content: r.content }); // маркер сжатия — только для интерфейса
+    }
     else if (r.role === 'assistant') {
       out.push({ role: 'assistant', content: r.content, ...(r.tool_calls?.length ? { toolCalls: r.tool_calls } : {}) });
     } else {
@@ -140,16 +155,71 @@ export class ConversationService {
 
   async list(kind: ConversationKind = 'chat', limit = 100): Promise<ConversationDto[]> {
     const rows = await this.ctx.db.query<ConversationRow>(
-      'select * from conversations where kind = $1 order by updated_at desc limit $2',
+      `select c.*,
+              (select left(regexp_replace(m.content, '[[:space:]]+', ' ', 'g'), 140)
+                 from messages m
+                where m.conversation_id = c.id and m.role in ('user', 'assistant') and m.content <> ''
+                order by m.seq desc limit 1) as preview
+         from conversations c
+        where c.kind = $1 and not c.is_main
+        order by c.pinned desc, c.updated_at desc
+        limit $2`,
       [kind, limit],
     );
     return rows.map(toConversationDto);
+  }
+
+  /** Единый разговор владельца: создаётся при первом обращении, дальше всегда один и тот же. */
+  async main(): Promise<ConversationDto> {
+    const find = () => queryOne<ConversationRow>(this.ctx.db, 'select * from conversations where is_main limit 1');
+    let row = await find();
+    if (!row) {
+      await this.ctx.db.query(
+        `insert into conversations (title, kind, is_main) values ('Polaris', 'chat', true) on conflict do nothing`,
+      );
+      row = await find();
+    }
+    return toConversationDto(row!);
+  }
+
+  /** Сообщение от Polaris в единый разговор (утренняя сводка, итоги задач). */
+  async postToMain(content: string): Promise<void> {
+    const main = await this.main();
+    await this.add({ conversationId: main.id, role: 'assistant', content, provider: 'polaris' });
+  }
+
+  async summaryState(id: string): Promise<{ summary: string; upto: number }> {
+    const row = await queryOne<{ summary: string; summary_upto: number }>(
+      this.ctx.db,
+      'select summary, summary_upto from conversations where id = $1',
+      [id],
+    );
+    return { summary: row?.summary ?? '', upto: row?.summary_upto ?? 0 };
+  }
+
+  async setSummary(id: string, summary: string, upto: number): Promise<void> {
+    await this.ctx.db.query('update conversations set summary = $2, summary_upto = $3 where id = $1', [id, summary, upto]);
+  }
+
+  /** Поиск по тексту реплик пользователя и ассистента (в том числе уже сжатых в сводку). */
+  async searchMessages(conversationId: string, query: string, limit = 6): Promise<MessageRow[]> {
+    const like = `%${query.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
+    return this.ctx.db.query<MessageRow>(
+      `select * from messages
+        where conversation_id = $1 and role in ('user', 'assistant') and content ilike $2
+        order by seq desc limit $3`,
+      [conversationId, like, limit],
+    );
   }
 
   async get(id: string): Promise<ConversationDto> {
     const row = await queryOne<ConversationRow>(this.ctx.db, 'select * from conversations where id = $1', [id]);
     if (!row) throw notFound('Чат не найден');
     return toConversationDto(row);
+  }
+
+  async setPinned(id: string, pinned: boolean): Promise<void> {
+    await this.ctx.db.query('update conversations set pinned = $2 where id = $1', [id, pinned]);
   }
 
   async rename(id: string, title: string): Promise<void> {
@@ -163,12 +233,13 @@ export class ConversationService {
     await this.ctx.db.query('delete from conversations where id = $1', [id]);
   }
 
-  async messages(conversationId: string, afterSeq = 0, limit = 500): Promise<MessageRow[]> {
+  /** Последние `limit` сообщений после `afterSeq` (и, если задано, раньше `beforeSeq`) — по возрастанию seq. */
+  async messages(conversationId: string, afterSeq = 0, limit = 500, beforeSeq?: number): Promise<MessageRow[]> {
     const rows = await this.ctx.db.query<MessageRow>(
       `select * from (
-         select * from messages where conversation_id = $1 and seq > $2 order by seq desc limit $3
+         select * from messages where conversation_id = $1 and seq > $2 and seq < $4 order by seq desc limit $3
        ) t order by seq asc`,
-      [conversationId, afterSeq, limit],
+      [conversationId, afterSeq, limit, beforeSeq ?? 2_147_483_647],
     );
     return rows;
   }

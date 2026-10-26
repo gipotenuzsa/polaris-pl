@@ -97,6 +97,7 @@ export class RunManager {
         onText: (delta) => this.live.set(conversationId, (this.live.get(conversationId) ?? '') + delta),
         onTextReset: () => this.live.delete(conversationId),
       });
+      void app.compaction.maybeCompact(conversationId); // фоновое сжатие длинного разговора
       // Ответ готов, а пользователь ушёл из приложения: сообщение приходит на телефон, как в мессенджере.
       // (Запросы на подтверждение отправляются отдельным уведомлением.)
       if (outcome.status === 'done' && outcome.text.trim() && !this.isBeingViewed(conversationId)) {

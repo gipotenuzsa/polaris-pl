@@ -123,7 +123,7 @@ describe('миграции', () => {
   it('применяются один раз и создают все таблицы из спецификации', async () => {
     const db = await createTestDb();
     const first = await migrate(db);
-    expect(first).toEqual(['0001_init.sql', '0002_push.sql', '0003_attachments.sql']);
+    expect(first).toEqual(['0001_init.sql', '0002_push.sql', '0003_attachments.sql', '0004_pinned_chats.sql', '0005_main_conversation.sql']);
     expect(await migrate(db)).toEqual([]);
     const tables = (
       await db.query<{ tablename: string }>(`select tablename from pg_tables where schemaname = 'public'`)

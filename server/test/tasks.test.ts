@@ -276,10 +276,15 @@ describe('утренняя сводка', () => {
     expect(conv.messages[0].content).toContain('Фоновая задача к сводке');
     expect(conv.messages[0].content).toContain('Позвонить врачу');
     expect(conv.messages.at(-1).content).toContain('Доброе утро');
+    // сводка приходит в единый разговор, а уведомление ведёт туда же
+    const main = (await api('GET', '/api/main', h)).body.conversation;
     expect((await api('GET', '/api/notifications', h)).body.items[0]).toMatchObject({
       kind: 'morning',
-      ref: { conversationId: summaries[0]!.id },
+      ref: { conversationId: main.id },
     });
+    const thread = (await api('GET', `/api/conversations/${main.id}`, h)).body;
+    expect(thread.messages.at(-1).content).toContain('Утренняя сводка');
+    expect(thread.messages.at(-1).content).toContain('Доброе утро');
 
     now = new Date('2026-07-02T08:01:00Z');
     expect((await env.ctx.scheduler.tick()).morningStarted).toBe(true); // новый день

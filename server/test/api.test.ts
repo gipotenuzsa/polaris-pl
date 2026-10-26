@@ -1,5 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import type { ChatRequest, ChatResponse, ModelProvider } from '../src/providers/types.js';
+import { z } from 'zod';
+import { defineTool } from '../src/tools/types.js';
 import { createTestEnv, login, TEST_PASSWORD, toolCall, waitFor, type TestEnv } from './helpers.js';
 
 let env: TestEnv;
@@ -726,5 +728,161 @@ describe('вложения-изображения', () => {
     });
     expect(empty.statusCode).toBe(400);
     expect((await env.app.inject({ method: 'POST', url: '/api/attachments', payload: {} })).statusCode).toBe(401);
+  });
+});
+
+describe('список чатов: превью и закрепление', () => {
+  it('показывает превью последнего сообщения; закреплённые идут первыми', async () => {
+    env = await createTestEnv({ script: () => ({ content: 'Ответ\nв две строки' }) });
+    const h = await login(env.app);
+    const make = async (text: string) => {
+      const { conversation } = (
+        await env.app.inject({ method: 'POST', url: '/api/conversations', headers: h, payload: {} })
+      ).json();
+      await env.app.inject({
+        method: 'POST',
+        url: `/api/conversations/${conversation.id}/messages`,
+        headers: h,
+        payload: { content: text },
+      });
+      await env.ctx.runs.idle();
+      return conversation.id as string;
+    };
+    const first = await make('первый');
+    await make('второй');
+    const list = async () => (await env.app.inject({ url: '/api/conversations', headers: h })).json().conversations;
+
+    expect((await list()).map((c: { title: string }) => c.title)).toEqual(['второй', 'первый']);
+    expect((await list())[0]).toMatchObject({ pinned: false, preview: 'Ответ в две строки' });
+
+    const pin = await env.app.inject({
+      method: 'PATCH',
+      url: `/api/conversations/${first}`,
+      headers: h,
+      payload: { pinned: true },
+    });
+    expect(pin.statusCode).toBe(200);
+    expect((await list()).map((c: { title: string }) => c.title)).toEqual(['первый', 'второй']);
+    expect((await list())[0].pinned).toBe(true);
+
+    const none = await env.app.inject({ method: 'PATCH', url: `/api/conversations/${first}`, headers: h, payload: {} });
+    expect(none.statusCode).toBe(400);
+  });
+});
+
+describe('единый разговор, сжатие контекста, история и субагент', () => {
+  const sendTo = async (h: Record<string, string>, id: string, content: string) => {
+    const res = await env.app.inject({
+      method: 'POST',
+      url: `/api/conversations/${id}/messages`,
+      headers: h,
+      payload: { content },
+    });
+    expect(res.statusCode).toBe(202);
+    await env.ctx.runs.idle();
+  };
+  const mainId = async (h: Record<string, string>) =>
+    (await env.app.inject({ url: '/api/main', headers: h })).json().conversation.id as string;
+
+  it('главный разговор один, не попадает в список чатов; сообщения читаются страницами', async () => {
+    env = await createTestEnv({ script: () => ({ content: 'ок' }) });
+    const h = await login(env.app);
+    const id = await mainId(h);
+    expect(await mainId(h)).toBe(id);
+    expect((await env.app.inject({ url: '/api/main', headers: h })).json().conversation.isMain).toBe(true);
+    const list = (await env.app.inject({ url: '/api/conversations', headers: h })).json().conversations;
+    expect(list.find((c: { id: string }) => c.id === id)).toBeUndefined();
+
+    for (const t of ['раз', 'два', 'три']) await sendTo(h, id, t); // 6 сообщений
+    const page = (await env.app.inject({ url: `/api/conversations/${id}?limit=2`, headers: h })).json();
+    expect(page.messages.map((m: { content: string }) => m.content)).toEqual(['три', 'ок']);
+    const before = page.messages[0].seq as number;
+    const older = (await env.app.inject({ url: `/api/conversations/${id}?limit=2&before=${before}`, headers: h })).json();
+    expect(older.messages.map((m: { content: string }) => m.content)).toEqual(['два', 'ок']);
+  });
+
+  it('длинный разговор сжимается в сводку: модель видит сводку и свежий хвост, а не всю историю', async () => {
+    env = await createTestEnv({
+      config: { AGENT_CONTEXT_TOKENS: '600' },
+      script: (req) =>
+        req.messages[0]?.content.includes('сжимаешь') ? { content: 'СВОДКА: пользователя зовут Алия' } : { content: 'принято' },
+    });
+    const h = await login(env.app);
+    const id = await mainId(h);
+    const filler = ' слово'.repeat(120);
+    for (let i = 0; i < 6; i++) {
+      await sendTo(h, id, `сообщение ${i}${filler}`);
+      await waitFor(async () => !(env.ctx.compaction as unknown as { running: Set<string> }).running.size);
+    }
+    const state = await env.ctx.conversations.summaryState(id);
+    expect(state.summary).toContain('СВОДКА');
+    expect(state.upto).toBeGreaterThan(0);
+
+    const conv = (await env.app.inject({ url: `/api/conversations/${id}`, headers: h })).json();
+    expect(conv.messages.some((m: { role: string; toolName?: string }) => m.role === 'system' && m.toolName === 'compaction')).toBe(true);
+
+    await sendTo(h, id, 'последний вопрос');
+    const last = env.provider.calls.at(-1)!;
+    expect(last.messages[0]!.content).toContain('СВОДКА: пользователя зовут Алия');
+    const texts = last.messages.map((m) => m.content).join('\n');
+    expect(texts).toContain('последний вопрос');
+    expect(texts).not.toContain('сообщение 0'); // самое раннее уже в сводке
+    expect(last.messages.every((m) => !(m.role === 'system' && m.content.includes('Ранняя часть разговора')))).toBe(true);
+  });
+
+  it('history_search находит реплики, уже ушедшие в сводку', async () => {
+    env = await createTestEnv({
+      script: (req, call) => {
+        const last = req.messages.at(-1)!;
+        if (last.role === 'user' && last.content.includes('что мы решили')) {
+          return { toolCalls: [toolCall('history_search', { query: 'тариф Лайт' }, 'h1')] };
+        }
+        if (last.role === 'tool') return { content: `нашёл: ${last.content.slice(0, 80)}` };
+        return { content: `ответ ${call}` };
+      },
+    });
+    const h = await login(env.app);
+    const id = await mainId(h);
+    await sendTo(h, id, 'я выбрал тариф Лайт за 5 долларов');
+    await sendTo(h, id, 'что мы решили?');
+    const msgs = (await env.app.inject({ url: `/api/conversations/${id}`, headers: h })).json().messages;
+    const tool = msgs.find((m: { role: string }) => m.role === 'tool');
+    expect(tool.content).toContain('тариф Лайт за 5 долларов');
+    const miss = await env.ctx.tools.get('history_search')!.execute({ query: 'никогда-не-было' }, { app: env.ctx, conversationId: id });
+    expect(miss.content).toContain('ничего не найдено');
+  });
+
+  it('субагент research работает в отдельном контексте и возвращает только выжимку', async () => {
+    env = await createTestEnv({
+      extraTools: [
+        defineTool({
+          name: 'web_search',
+          description: 'поиск',
+          schema: z.object({ query: z.string() }),
+          describe: (a) => `поиск ${a.query}`,
+          async execute() {
+            return { content: 'ОГРОМНАЯ СТРАНИЦА '.repeat(500) };
+          },
+        }),
+      ],
+      script: (req) => {
+        const sys = req.messages[0]!.content;
+        const last = req.messages.at(-1)!;
+        if (sys.includes('субагент-исследователь')) {
+          return last.role === 'tool' ? { content: 'ВЫЖИМКА: главное за 3 пункта' } : { toolCalls: [toolCall('web_search', { query: 'тема' }, 's1')] };
+        }
+        if (last.role === 'tool') return { content: `итог: ${last.content}` };
+        return { toolCalls: [toolCall('research', { question: 'Сравни три источника про тему' }, 'r1')] };
+      },
+    });
+    const h = await login(env.app);
+    const id = await mainId(h);
+    await sendTo(h, id, 'изучи тему');
+    const msgs = (await env.app.inject({ url: `/api/conversations/${id}`, headers: h })).json().messages;
+    const research = msgs.find((m: { toolName?: string }) => m.toolName === 'research');
+    expect(research.content).toBe('ВЫЖИМКА: главное за 3 пункта');
+    expect(msgs.some((m: { content: string }) => m.content.includes('ОГРОМНАЯ СТРАНИЦА'))).toBe(false);
+    const all = (await env.app.inject({ url: '/api/conversations?kind=task', headers: h })).json().conversations;
+    expect(all.some((c: { title: string }) => c.title.startsWith('Исследование'))).toBe(false); // временный контекст удалён
   });
 });

@@ -1,12 +1,14 @@
 import { Ionicons } from '@expo/vector-icons';
-import { Stack, useRouter } from 'expo-router';
-import { Pressable, ScrollView, Text, View } from 'react-native';
-import { api } from '../../src/api';
-import { useAuth } from '../../src/auth';
-import { useLoad } from '../../src/hooks';
-import { useStatus } from '../../src/status';
-import { colors, radius, space } from '../../src/theme';
-import { Button, Muted, Screen, type IconName } from '../../src/ui';
+import { useRouter } from 'expo-router';
+import { ScrollView, Text, View } from 'react-native';
+import { api } from '../src/api';
+import { useAuth } from '../src/auth';
+import { Header } from '../src/Header';
+import { useLoad } from '../src/hooks';
+import { PressScale } from '../src/motion';
+import { useStatus } from '../src/status';
+import { colors, radius, space } from '../src/theme';
+import { Button, Muted, Screen, type IconName } from '../src/ui';
 
 function Item({
   icon,
@@ -22,9 +24,10 @@ function Item({
   onPress: () => void;
 }) {
   return (
-    <Pressable
+    <PressScale
       onPress={onPress}
-      style={({ pressed }) => ({
+      scale={0.985}
+      style={{
         flexDirection: 'row',
         alignItems: 'center',
         backgroundColor: colors.surface,
@@ -33,8 +36,7 @@ function Item({
         borderColor: colors.border,
         padding: space.lg,
         marginBottom: space.sm,
-        opacity: pressed ? 0.8 : 1,
-      })}
+      }}
     >
       <Ionicons name={icon} size={22} color={colors.accent} />
       <View style={{ flex: 1, marginLeft: space.md }}>
@@ -56,26 +58,39 @@ function Item({
         </View>
       ) : null}
       <Ionicons name="chevron-forward" size={18} color={colors.muted} />
-    </Pressable>
+    </PressScale>
   );
 }
 
 export default function More() {
   const router = useRouter();
   const { signOut } = useAuth();
-  const { unread } = useStatus();
+  const { unread, approvals } = useStatus();
   const { data: status } = useLoad(() => api.status(), 30_000);
 
   return (
-    <Screen edges={['left', 'right']}>
-      <Stack.Screen options={{ headerTitle: 'Ещё' }} />
-      <ScrollView contentContainerStyle={{ padding: space.lg }}>
+    <Screen edges={['left', 'right', 'bottom']}>
+      <Header title="Ещё" subtitle="Всё остальное в Polaris" back />
+      <ScrollView contentContainerStyle={{ padding: space.lg, width: '100%', maxWidth: 760, alignSelf: 'center' }}>
+        <Item
+          icon="shield-checkmark-outline"
+          title="Подтверждения"
+          hint="Рискованные действия ждут вашего «Одобрить»"
+          badge={approvals}
+          onPress={() => router.push('/approvals')}
+        />
         <Item
           icon="notifications-outline"
           title="Уведомления"
           hint="Результаты задач, напоминания, сводки"
           badge={unread}
           onPress={() => router.push('/inbox')}
+        />
+        <Item
+          icon="albums-outline"
+          title="Архив тем"
+          hint="Отдельные чаты вне основного разговора"
+          onPress={() => router.push('/chats')}
         />
         <Item icon="document-text-outline" title="Заметки" onPress={() => router.push('/notes')} />
         <Item

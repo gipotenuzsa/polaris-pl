@@ -4,6 +4,9 @@ export interface Conversation {
   id: string;
   title: string;
   kind: 'chat' | 'task' | 'summary';
+  pinned: boolean;
+  /** Начало последнего сообщения */
+  preview?: string;
   createdAt: string;
   updatedAt: string;
 }

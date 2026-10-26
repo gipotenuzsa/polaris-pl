@@ -1,11 +1,11 @@
-import { Stack } from 'expo-router';
 import { FlatList, RefreshControl } from 'react-native';
-import { api } from '../../src/api';
-import { ApprovalCard } from '../../src/ApprovalCard';
-import { useLoad } from '../../src/hooks';
-import { useStatus } from '../../src/status';
-import { colors, space } from '../../src/theme';
-import { Empty, ErrorNote, Loading, Muted, Screen, SectionTitle } from '../../src/ui';
+import { api } from '../src/api';
+import { ApprovalCard } from '../src/ApprovalCard';
+import { Header } from '../src/Header';
+import { useLoad } from '../src/hooks';
+import { useStatus } from '../src/status';
+import { colors, space } from '../src/theme';
+import { Empty, ErrorNote, Loading, Muted, Screen, SectionTitle } from '../src/ui';
 
 export default function Approvals() {
   const { refresh: refreshStatus } = useStatus();
@@ -19,14 +19,14 @@ export default function Approvals() {
   };
 
   return (
-    <Screen edges={['left', 'right']}>
-      <Stack.Screen options={{ headerTitle: 'Подтверждения' }} />
+    <Screen edges={['left', 'right', 'bottom']}>
+      <Header title="Подтверждения" subtitle={pending.length ? `Ждут решения: ${pending.length}` : 'Всё под контролем'} back />
       {loading && !data ? <Loading /> : null}
       <ErrorNote message={error} onRetry={refresh} />
       <FlatList
         data={[...pending, ...done]}
         keyExtractor={(a) => a.id}
-        contentContainerStyle={{ padding: space.lg, flexGrow: 1 }}
+        contentContainerStyle={{ paddingHorizontal: space.lg, paddingBottom: space.xl, flexGrow: 1, width: '100%', maxWidth: 760, alignSelf: 'center' }}
         refreshControl={<RefreshControl refreshing={false} onRefresh={refresh} tintColor={colors.accent} />}
         ListHeaderComponent={
           <>

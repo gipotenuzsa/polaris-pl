@@ -5,6 +5,7 @@ import type { ChatGptAuth } from './providers/chatgpt/auth.js';
 import type { ActionsService } from './services/actions.js';
 import type { ApprovalsService } from './services/approvals.js';
 import type { BudgetService } from './services/budget.js';
+import type { CompactionService } from './services/compaction.js';
 import type { ConversationService } from './services/conversations.js';
 import type { MemoryService } from './services/memory.js';
 import type { MorningService } from './services/morning.js';
@@ -44,6 +45,7 @@ export interface AppContext {
   notifications: NotificationsService;
   push: PushService;
   conversations: ConversationService;
+  compaction: CompactionService;
   runs: RunManager;
   tasks: TaskService;
   morning: MorningService;

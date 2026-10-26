@@ -1,9 +1,9 @@
 import { Ionicons } from '@expo/vector-icons';
-import { Stack } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { FlatList, Modal, Pressable, RefreshControl, Text, TextInput, View } from 'react-native';
 import { api } from '../../src/api';
 import { formatDateTime } from '../../src/format';
+import { Header } from '../../src/Header';
 import { useLoad } from '../../src/hooks';
 import { colors, radius, space } from '../../src/theme';
 import type { MemoryItem } from '../../src/types';
@@ -59,26 +59,24 @@ export default function Memory() {
 
   return (
     <Screen edges={['left', 'right']}>
-      <Stack.Screen
-        options={{
-          headerTitle: 'Память',
-          headerRight: () => (
-            <Pressable
-              onPress={() => setEditing({ id: null, kind: 'fact', content: '' })}
-              style={{ paddingHorizontal: space.lg }}
-              accessibilityLabel="Добавить запись"
-            >
-              <Ionicons name="add-circle-outline" size={28} color={colors.accent} />
-            </Pressable>
-          ),
-        }}
+      <Header
+        title="Память"
+        subtitle={data?.items.length ? `Записей: ${data.items.length}` : 'Что Polaris помнит о вас'}
+        actions={[
+          {
+            icon: 'add',
+            label: 'Добавить запись',
+            primary: true,
+            onPress: () => setEditing({ id: null, kind: 'fact', content: '' }),
+          },
+        ]}
       />
       {loading && !data ? <Loading /> : null}
       <ErrorNote message={error} onRetry={refresh} />
       <FlatList
         data={items}
         keyExtractor={(m) => m.id}
-        contentContainerStyle={{ padding: space.lg, flexGrow: 1 }}
+        contentContainerStyle={{ paddingHorizontal: space.lg, paddingBottom: space.xl, flexGrow: 1, width: '100%', maxWidth: 760, alignSelf: 'center' }}
         refreshControl={<RefreshControl refreshing={false} onRefresh={refresh} tintColor={colors.accent} />}
         ListHeaderComponent={
           <View style={{ marginBottom: space.md }}>
@@ -127,7 +125,7 @@ export default function Memory() {
         )}
       />
       <Modal visible={editing !== null} animationType="slide" transparent onRequestClose={() => setEditing(null)}>
-        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' }}>
+        <View style={{ flex: 1, backgroundColor: 'rgba(43,38,32,0.35)', justifyContent: 'flex-end' }}>
           <View
             style={{
               backgroundColor: colors.surface,

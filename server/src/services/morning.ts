@@ -83,11 +83,13 @@ export class MorningService {
         toolFilter: (t) => ['web_search', 'read_url', 'memory_search', 'note_list', 'get_time'].includes(t.name),
       });
       if (outcome.status === 'done') {
+        // Сводка приходит в единый разговор, как сообщение от Polaris; отдельный чат остаётся в архиве.
+        await app.conversations.postToMain(`☀️ **Утренняя сводка**\n\n${outcome.text}`);
         await app.notifications.create({
           kind: 'morning',
           title: 'Утренняя сводка',
           body: outcome.text.slice(0, 1500),
-          ref: { conversationId: conv.id },
+          ref: { conversationId: (await app.conversations.main()).id },
         });
       }
       return outcome;

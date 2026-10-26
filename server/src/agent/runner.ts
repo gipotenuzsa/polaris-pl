@@ -63,6 +63,11 @@ export async function runAgent(app: AppContext, opts: RunOptions): Promise<RunOu
     app.conversations.add({ conversationId, role: 'assistant', content, status: 'error' }).then(() => undefined);
 
   await app.conversations.repairDanglingToolCalls(conversationId);
+  // Длинный разговор: старая часть заменена сводкой, в контекст идёт только хвост после неё.
+  const state = await app.conversations.summaryState(conversationId);
+  const system = state.summary
+    ? `${opts.system}\n\n## Сводка более ранней части разговора (она сжата, дословно её уже нет)\n${state.summary}\n\nЕсли нужна деталь, которой нет в сводке, найди её инструментом history_search, а не выдумывай.`
+    : opts.system;
 
   for (let step = 0; step < maxSteps; step++) {
     if (opts.signal?.aborted) {
@@ -70,7 +75,7 @@ export async function runAgent(app: AppContext, opts: RunOptions): Promise<RunOu
       return { status: 'failed', error: 'Остановлено' };
     }
 
-    const rows = await app.conversations.messages(conversationId, 0, 400);
+    const rows = await app.conversations.messages(conversationId, state.upto, 400);
     const pending = rows.filter((r) => r.role === 'tool' && r.status === 'pending');
     if (pending.length > 0) {
       return {
@@ -99,7 +104,7 @@ export async function runAgent(app: AppContext, opts: RunOptions): Promise<RunOu
     const meta = await app.conversations.attachmentMeta(userIds);
     const withImages = userIds.filter((id) => meta.has(id)).slice(-MAX_IMAGE_MESSAGES);
     const images = await app.conversations.attachmentImages(withImages);
-    const messages = buildMessages(opts.system, rows, app.config.agent.contextTokens, { images, meta });
+    const messages = buildMessages(system, rows, app.config.agent.contextTokens, { images, meta });
 
     let resp;
     try {

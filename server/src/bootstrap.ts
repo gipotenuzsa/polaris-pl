@@ -11,6 +11,7 @@ import type { ModelProvider } from './providers/types.js';
 import { ActionsService } from './services/actions.js';
 import { ApprovalsService } from './services/approvals.js';
 import { BudgetService } from './services/budget.js';
+import { CompactionService } from './services/compaction.js';
 import { ConversationService } from './services/conversations.js';
 import { MemoryService } from './services/memory.js';
 import { MorningService } from './services/morning.js';
@@ -26,6 +27,7 @@ import { SupabaseFileStore } from './storage/supabase.js';
 import type { FileStore } from './storage/types.js';
 import { BrowserService, browserTools } from './tools/browser.js';
 import { filesTools } from './tools/filesTools.js';
+import { historyTools } from './tools/historyTools.js';
 import { memoryTools } from './tools/memoryTools.js';
 import { notesTools } from './tools/notesTools.js';
 import { ToolRegistry } from './tools/registry.js';
@@ -85,6 +87,7 @@ export async function createContext(opts: BootstrapOptions): Promise<AppContext>
   ctx.notifications = new NotificationsService(ctx);
   ctx.push = new PushService(ctx, opts.pushSender);
   ctx.conversations = new ConversationService(ctx);
+  ctx.compaction = new CompactionService(ctx);
   ctx.runs = new RunManager(ctx);
   ctx.tasks = new TaskService(ctx);
   ctx.morning = new MorningService(ctx);
@@ -99,6 +102,7 @@ export async function createContext(opts: BootstrapOptions): Promise<AppContext>
     ...memoryTools(),
     ...filesTools(),
     ...tasksTools(),
+    ...historyTools(),
     readUrlTool(config.allowPrivateNetwork),
     ...(config.braveApiKey ? [webSearchTool(config.braveApiKey, ctx.fetch)] : []),
     ...(config.browser.enabled ? browserTools(new BrowserService(config, log), config.allowPrivateNetwork) : []),

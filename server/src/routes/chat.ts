@@ -51,12 +51,22 @@ export function chatRoutes(app: FastifyInstance, ctx: AppContext): void {
     return { conversation: await ctx.conversations.create(title || 'Новый чат') };
   });
 
+  // Единый сквозной разговор — главный экран приложения.
+  app.get('/api/main', async () => ({ conversation: await ctx.conversations.main() }));
+
   app.get('/api/conversations/:id', async (req) => {
     const { id } = parse(idParams, req.params);
-    const { after } = parse(z.object({ after: z.coerce.number().int().min(0).default(0) }), req.query);
+    const { after, before, limit } = parse(
+      z.object({
+        after: z.coerce.number().int().min(0).default(0),
+        before: z.coerce.number().int().min(1).optional(),
+        limit: z.coerce.number().int().min(1).max(500).default(500),
+      }),
+      req.query,
+    );
     const conversation = await ctx.conversations.get(id);
     ctx.runs.touchViewed(id);
-    const rows = await ctx.conversations.messages(id, after);
+    const rows = await ctx.conversations.messages(id, after, limit, before);
     return {
       conversation,
       messages: await ctx.conversations.toDtos(rows),
@@ -74,9 +84,15 @@ export function chatRoutes(app: FastifyInstance, ctx: AppContext): void {
 
   app.patch('/api/conversations/:id', async (req) => {
     const { id } = parse(idParams, req.params);
-    const { title } = parse(z.object({ title: z.string().min(1).max(200) }), req.body);
+    const { title, pinned } = parse(
+      z
+        .object({ title: z.string().trim().min(1).max(200).optional(), pinned: z.boolean().optional() })
+        .refine((b) => b.title !== undefined || b.pinned !== undefined, { message: 'Нечего менять' }),
+      req.body,
+    );
     await ctx.conversations.get(id);
-    await ctx.conversations.rename(id, title);
+    if (title !== undefined) await ctx.conversations.rename(id, title);
+    if (pinned !== undefined) await ctx.conversations.setPinned(id, pinned);
     return { ok: true };
   });
 

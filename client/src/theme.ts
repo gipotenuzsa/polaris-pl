@@ -67,6 +67,8 @@ export const TOOL_LABELS: Record<string, string> = {
   task_list: 'Список задач',
   task_cancel: 'Отмена задачи',
   get_time: 'Текущее время',
+  history_search: 'Поиск в истории',
+  research: 'Исследование',
 };
 
 export const toolLabel = (name: string) => TOOL_LABELS[name] ?? name;

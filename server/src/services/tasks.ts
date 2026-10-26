@@ -322,6 +322,7 @@ export class TaskService {
     if (outcome.status === 'done') {
       await settle(', last_result = $4, last_error = null', [outcome.text]);
       await this.addStep(task.id, { type: 'result', output: { text: outcome.text.slice(0, 4000) } });
+      await app.conversations.postToMain(`✅ **Готово: ${title}**\n\n${outcome.text}`).catch(() => undefined);
       await app.notifications.create({
         kind: 'task_done',
         title: `Готово: ${title}`,
@@ -334,6 +335,7 @@ export class TaskService {
     const error = outcome.status === 'failed' ? outcome.error : outcome.message;
     await settle(', last_error = $4', [error]);
     await this.addStep(task.id, { type: 'error', output: { error }, status: 'error' });
+    await app.conversations.postToMain(`⚠️ **Не выполнено: ${title}**\n\n${error}`).catch(() => undefined);
     await app.notifications.create({
       kind: 'task_failed',
       title: `Не выполнено: ${title}`,

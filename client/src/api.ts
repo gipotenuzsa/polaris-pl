@@ -187,7 +187,8 @@ export const api = {
   conversations: (kind: Conversation['kind'] = 'chat') =>
     get<{ conversations: Conversation[] }>(`/api/conversations${q({ kind })}`),
   createConversation: () => post<{ conversation: Conversation }>('/api/conversations'),
-  conversation: (id: string, after = 0) =>
+  main: () => get<{ conversation: Conversation }>('/api/main'),
+  conversation: (id: string, opts: { after?: number; limit?: number; before?: number } = {}) =>
     get<{
       conversation: Conversation;
       messages: Message[];
@@ -196,9 +197,10 @@ export const api = {
       live: string;
       pendingApprovals: Approval[];
     }>(
-      `/api/conversations/${id}${q({ after })}`,
+      `/api/conversations/${id}${q({ after: opts.after ?? 0, limit: opts.limit, before: opts.before })}`,
     ),
   renameConversation: (id: string, title: string) => patch<{ ok: true }>(`/api/conversations/${id}`, { title }),
+  pinConversation: (id: string, pinned: boolean) => patch<{ ok: true }>(`/api/conversations/${id}`, { pinned }),
   deleteConversation: (id: string) => del<{ ok: true }>(`/api/conversations/${id}`),
   stopConversation: (id: string) => post<{ stopped: boolean }>(`/api/conversations/${id}/stop`),
   sendMessage: (id: string, content: string, attachmentIds: string[] = []) =>
