@@ -14,6 +14,8 @@ export interface PushPayload {
   /** Уведомления с одинаковым tag заменяют друг друга. */
   tag?: string;
   urgent?: boolean;
+  /** Подтверждение, которое можно одобрить/отклонить кнопками прямо в уведомлении. */
+  approvalId?: string;
 }
 
 export interface PushSubscriptionInput {
@@ -151,6 +153,7 @@ export class PushService {
       body: clip(payload.body, 200),
       url: payload.url,
       tag: payload.tag,
+      approvalId: payload.approvalId,
     });
     const options: SendOptions = {
       vapidDetails: { subject: this.subject(), publicKey, privateKey },

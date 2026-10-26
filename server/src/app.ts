@@ -7,6 +7,7 @@ import { registerAuth } from './auth/auth.js';
 import type { AppContext } from './context.js';
 import { OAuthError } from './providers/chatgpt/oauth.js';
 import { agentRoutes } from './routes/agent.js';
+import { backupRoutes } from './routes/backup.js';
 import { chatRoutes } from './routes/chat.js';
 import { dataRoutes } from './routes/data.js';
 import { pushRoutes } from './routes/push.js';
@@ -76,6 +77,7 @@ export async function buildApp(ctx: AppContext, opts: { logger?: PinoLogger } = 
   dataRoutes(app, ctx);
   agentRoutes(app, ctx);
   pushRoutes(app, ctx);
+  backupRoutes(app, ctx);
 
   const web = await registerWeb(app, ctx);
   if (!web) {

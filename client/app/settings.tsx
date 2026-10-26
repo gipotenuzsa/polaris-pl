@@ -2,12 +2,12 @@ import * as Clipboard from 'expo-clipboard';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { KeyboardAvoidingView, Linking, Platform, RefreshControl, ScrollView, Text, View } from 'react-native';
-import { api } from '../src/api';
+import { api, downloadBackup } from '../src/api';
 import { formatNumber } from '../src/format';
 import { useLoad } from '../src/hooks';
 import { disablePush, enablePush, pushState } from '../src/push';
 import { colors, space } from '../src/theme';
-import type { BudgetLimits, BudgetSummary, ChatGptStatus, MorningSettings } from '../src/types';
+import type { BudgetLimits, BudgetSummary, ChatGptStatus, CheckinsSettings, MorningSettings } from '../src/types';
 import {
   Badge,
   Body,
@@ -53,6 +53,15 @@ function ChatGptCard({ status, onChange }: { status: ChatGptStatus; onChange: ()
       setBusy(null);
     }
   };
+
+  const finish = (url: string) =>
+    run('finish', async () => {
+      await api.chatgptCallback(url);
+      setFlow(null);
+      setPasted('');
+      onChange();
+      setCheck(await api.chatgptCheck());
+    });
 
   return (
     <Card>
@@ -151,9 +160,25 @@ function ChatGptCard({ status, onChange }: { status: ChatGptStatus; onChange: ()
             нормально. Скопируйте полный адрес из строки браузера и вставьте сюда.
           </Body>
           <View style={{ marginTop: space.sm }}>
+            <Button
+              title="Вставить из буфера и войти"
+              icon="clipboard-outline"
+              variant="secondary"
+              loading={busy === 'finish'}
+              onPress={async () => {
+                const t = (await Clipboard.getStringAsync()).trim();
+                if (!t) return notify('Буфер пуст', 'Сначала скопируйте адрес из строки браузера.');
+                setPasted(t);
+                void finish(t);
+              }}
+              style={{ marginBottom: space.sm }}
+            />
             <Input
               value={pasted}
-              onChangeText={setPasted}
+              onChangeText={(t) => {
+                setPasted(t);
+                if (/[?&]code=/.test(t) && /[?&]state=/.test(t)) void finish(t.trim()); // вставили адрес целиком — входим сразу
+              }}
               placeholder="http://localhost:1455/auth/callback?code=…&state=…"
               multiline
             />
@@ -163,15 +188,7 @@ function ChatGptCard({ status, onChange }: { status: ChatGptStatus; onChange: ()
               title="Завершить вход"
               loading={busy === 'finish'}
               disabled={!pasted.trim()}
-              onPress={() =>
-                run('finish', async () => {
-                  await api.chatgptCallback(pasted.trim());
-                  setFlow(null);
-                  setPasted('');
-                  onChange();
-                  setCheck(await api.chatgptCheck());
-                })
-              }
+              onPress={() => void finish(pasted.trim())}
               style={{ flex: 1, marginRight: space.sm }}
             />
             <Button
@@ -428,6 +445,147 @@ function MorningCard() {
   );
 }
 
+// ── Проактивные проверки ───────────────────────────────────────────────────────
+
+function CheckinsForm({ initial, onSaved }: { initial: CheckinsSettings; onSaved: () => Promise<void> }) {
+  const [enabled, setEnabled] = useState(initial.enabled);
+  const [hours, setHours] = useState(initial.everyHours);
+  const [from, setFrom] = useState(initial.quietFrom);
+  const [to, setTo] = useState(initial.quietTo);
+  const [busy, setBusy] = useState<string | null>(null);
+
+  const run = async (name: string, fn: () => Promise<void>) => {
+    setBusy(name);
+    try {
+      await fn();
+    } catch (e) {
+      notify('Ошибка', errText(e));
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  return (
+    <Card>
+      <Toggle
+        label="Polaris сам пишет, когда есть повод"
+        value={enabled}
+        onChange={setEnabled}
+        hint="Каждые несколько часов просматривает дела, напоминания и вашу память. Если сообщать нечего — молчит (токены тратятся только на проверку)"
+      />
+      <Muted style={{ marginBottom: 6 }}>Как часто проверять</Muted>
+      <Row style={{ flexWrap: 'wrap', marginBottom: space.sm }}>
+        {[1, 3, 6, 12].map((h) => (
+          <Chip key={h} label={`каждые ${h} ч`} active={hours === h} onPress={() => setHours(h)} />
+        ))}
+      </Row>
+      <Row>
+        <View style={{ flex: 1, marginRight: space.sm }}>
+          <Input label="Тихие часы с" value={from} onChangeText={setFrom} placeholder="22:00" />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Input label="до" value={to} onChangeText={setTo} placeholder="08:00" />
+        </View>
+      </Row>
+      <Row style={{ flexWrap: 'wrap' }}>
+        <Button
+          title="Сохранить"
+          loading={busy === 'save'}
+          onPress={() =>
+            run('save', async () => {
+              await api.saveCheckins({ enabled, everyHours: hours, quietFrom: from.trim(), quietTo: to.trim(), timezone: initial.timezone });
+              await onSaved();
+              notify('Сохранено');
+            })
+          }
+          style={{ marginRight: space.sm, marginBottom: space.sm }}
+        />
+        <Button
+          title="Проверить сейчас"
+          variant="secondary"
+          loading={busy === 'now'}
+          onPress={() =>
+            run('now', async () => {
+              const r = await api.runCheckin();
+              notify(r.posted ? 'Есть что сказать' : 'Пока сообщать нечего', r.posted ? 'Сообщение появилось в разговоре.' : 'Polaris проверил дела и решил промолчать.');
+            })
+          }
+          style={{ marginBottom: space.sm }}
+        />
+      </Row>
+    </Card>
+  );
+}
+
+function CheckinsCard() {
+  const { data, error, refresh } = useLoad(() => api.settings());
+  return (
+    <>
+      <ErrorNote message={error} />
+      {data ? <CheckinsForm key={JSON.stringify(data.checkins)} initial={data.checkins} onSaved={refresh} /> : <Loading />}
+    </>
+  );
+}
+
+// ── Резервная копия данных ─────────────────────────────────────────────────────
+
+function BackupCard() {
+  const [busy, setBusy] = useState<string | null>(null);
+  if (Platform.OS !== 'web') {
+    return (
+      <Card>
+        <Muted>Копию данных можно скачать и восстановить в веб-версии (откройте адрес сервера в браузере) и в Windows-приложении.</Muted>
+      </Card>
+    );
+  }
+
+  const download = async () => {
+    setBusy('download');
+    try {
+      await downloadBackup();
+    } catch (e) {
+      notify('Не удалось скачать', errText(e));
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const restore = () => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'application/json,.json';
+    input.onchange = async () => {
+      const file = input.files?.[0];
+      if (!file) return;
+      if (!(await confirmAction('Заменить данные?', `Все текущие данные на этом сервере (переписка, память, задачи) будут заменены содержимым файла «${file.name}». Это нельзя отменить.`, 'Заменить'))) return;
+      setBusy('restore');
+      try {
+        const counts = await api.restoreBackup(JSON.parse(await file.text()));
+        notify('Данные восстановлены', `Сообщений: ${counts.counts.messages ?? 0}, записей памяти: ${counts.counts.memory ?? 0}. Страница перезагрузится.`);
+        globalThis.location?.assign('/');
+      } catch (e) {
+        notify('Не удалось восстановить', errText(e));
+      } finally {
+        setBusy(null);
+      }
+    };
+    input.click();
+  };
+
+  return (
+    <Card>
+      <Muted style={{ marginBottom: space.md }}>
+        Файл со всей перепиской, памятью, заметками, задачами и настройками. Нужен для переезда на другую базу данных и как страховка. Вход в ChatGPT и
+        уведомления в копию не входят — после переезда подключите их заново.
+      </Muted>
+      <Row style={{ flexWrap: 'wrap' }}>
+        <Button title="Скачать копию" icon="download-outline" loading={busy === 'download'} onPress={download} style={{ marginRight: space.sm, marginBottom: space.sm }} />
+        <Button title="Восстановить из файла" variant="secondary" icon="cloud-upload-outline" loading={busy === 'restore'} onPress={restore} style={{ marginBottom: space.sm }} />
+      </Row>
+    </Card>
+  );
+}
+
 // ── Push-уведомления на телефон (PWA) ──────────────────────────────────────────
 
 function PushCard() {
@@ -547,6 +705,12 @@ export default function Settings() {
 
           <SectionTitle>Утренняя сводка</SectionTitle>
           <MorningCard />
+
+          <SectionTitle>Проактивные проверки</SectionTitle>
+          <CheckinsCard />
+
+          <SectionTitle>Резервная копия</SectionTitle>
+          <BackupCard />
         </ScrollView>
       </KeyboardAvoidingView>
     </Screen>

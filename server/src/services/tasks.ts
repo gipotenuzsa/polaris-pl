@@ -322,6 +322,7 @@ export class TaskService {
     if (outcome.status === 'done') {
       await settle(', last_result = $4, last_error = null', [outcome.text]);
       await this.addStep(task.id, { type: 'result', output: { text: outcome.text.slice(0, 4000) } });
+      if (/^\s*НЕТ ИЗМЕНЕНИЙ/i.test(outcome.text)) return; // задача-наблюдатель: повода сообщать нет — молчим
       await app.conversations.postToMain(`✅ **Готово: ${title}**\n\n${outcome.text}`).catch(() => undefined);
       await app.notifications.create({
         kind: 'task_done',

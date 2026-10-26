@@ -26,7 +26,7 @@ export class MorningService {
     return true;
   }
 
-  private async gatherData(now: Date): Promise<string> {
+  async gatherData(now: Date): Promise<string> {
     const { db, config } = this.ctx;
     const tz = config.timezone;
     const lines: string[] = [];

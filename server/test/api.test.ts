@@ -886,3 +886,168 @@ describe('единый разговор, сжатие контекста, ист
     expect(all.some((c: { title: string }) => c.title.startsWith('Исследование'))).toBe(false); // временный контекст удалён
   });
 });
+
+describe('резервная копия, проверки, наблюдатели, повтор и поиск', () => {
+  const sendTo = async (h: Record<string, string>, id: string, content: string) => {
+    const res = await env.app.inject({ method: 'POST', url: `/api/conversations/${id}/messages`, headers: h, payload: { content } });
+    expect(res.statusCode).toBe(202);
+    await env.ctx.runs.idle();
+  };
+  const mainOf = async (h: Record<string, string>) =>
+    (await env.app.inject({ url: '/api/main', headers: h })).json().conversation.id as string;
+  const thread = async (h: Record<string, string>, id: string) =>
+    (await env.app.inject({ url: `/api/conversations/${id}`, headers: h })).json().messages as {
+      role: string;
+      content: string;
+      provider?: string;
+    }[];
+
+  it('копия данных восстанавливается на пустой базе: переписка, память, вложения, порядок сообщений', async () => {
+    env = await createTestEnv({ script: () => ({ content: 'ответ' }) });
+    let h = await login(env.app);
+    const id = await mainOf(h);
+    const att = (
+      await env.app.inject({
+        method: 'POST',
+        url: '/api/attachments',
+        headers: h,
+        payload: { name: 'a.png', mime: 'image/png', data: 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==' },
+      })
+    ).json().attachment;
+    await env.app.inject({
+      method: 'POST',
+      url: `/api/conversations/${id}/messages`,
+      headers: h,
+      payload: { content: 'первое', attachmentIds: [att.id] },
+    });
+    await env.ctx.runs.idle();
+    await env.ctx.memory.create({ kind: 'fact', content: 'Живу в Алматы', source: 'user' });
+    await sendTo(h, id, 'второе');
+
+    const dump = await env.app.inject({ url: '/api/backup', headers: h });
+    expect(dump.statusCode).toBe(200);
+    expect(String(dump.headers['content-disposition'])).toContain('polaris-backup-');
+    const file = dump.json();
+    expect(file.format).toBe('polaris-backup');
+    expect(file.tables.settings.some((r: { key: string }) => r.key === 'webpush')).toBe(false); // секреты не выгружаются
+    await env.close();
+
+    // «новый сервер» с пустой базой: уже есть пустой главный разговор, он должен быть заменён
+    env = await createTestEnv({ script: () => ({ content: 'ответ' }) });
+    h = await login(env.app);
+    const freshMain = await mainOf(h);
+    expect(freshMain).not.toBe(id);
+
+    const bad = await env.app.inject({ method: 'POST', url: '/api/backup/restore', headers: h, payload: { replace: true, backup: { x: 1 } } });
+    expect(bad.statusCode).toBe(400);
+    const noConfirm = await env.app.inject({ method: 'POST', url: '/api/backup/restore', headers: h, payload: { backup: file } });
+    expect(noConfirm.statusCode).toBe(400);
+
+    const res = await env.app.inject({ method: 'POST', url: '/api/backup/restore', headers: h, payload: { replace: true, backup: file } });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().counts.messages).toBe(4);
+
+    expect(await mainOf(h)).toBe(id);
+    const msgs = await thread(h, id);
+    expect(msgs.map((m) => m.content)).toEqual(['первое', 'ответ', 'второе', 'ответ']);
+    const restored = (await env.app.inject({ url: `/api/conversations/${id}`, headers: h })).json().messages[0].attachments;
+    expect(restored).toHaveLength(1);
+    const img = await env.app.inject({ url: `/api/attachments/${restored[0].id}`, headers: h });
+    expect(img.headers['content-type']).toBe('image/png');
+    expect((await env.ctx.memory.search('Алматы', 5))[0]?.content).toBe('Живу в Алматы');
+
+    await sendTo(h, id, 'после восстановления'); // последовательность seq продолжается без конфликтов
+    expect((await thread(h, id)).at(-2)!.content).toBe('после восстановления');
+  });
+
+  it('проверки: молчат, когда сообщать нечего; пишут в разговор, когда есть что; уважают тихие часы и интервал', async () => {
+    let answer = 'НИЧЕГО';
+    let now = new Date('2026-07-01T12:00:00Z');
+    env = await createTestEnv({
+      clock: () => now,
+      config: { INSTANCE_TIMEZONE: 'UTC' },
+      script: (req) =>
+        String(req.messages[0]!.content).includes('периодической проверки') ? { content: answer } : { content: 'ок' },
+    });
+    const h = await login(env.app);
+    const id = await mainOf(h);
+    const put = await env.app.inject({
+      method: 'PUT',
+      url: '/api/settings/checkins',
+      headers: h,
+      payload: { enabled: true, everyHours: 3, quietFrom: '22:00', quietTo: '08:00', timezone: 'UTC' },
+    });
+    expect(put.statusCode).toBe(200);
+
+    expect(await env.ctx.checkins.maybeRun(now)).toBe(true); // днём — запускается
+    await waitFor(async () => !(env.ctx.checkins as unknown as { running: boolean }).running);
+    expect((await thread(h, id)).length).toBe(0); // НИЧЕГО — ничего не публикуем
+    expect(await env.ctx.checkins.maybeRun(now)).toBe(false); // слишком рано
+
+    now = new Date('2026-07-01T16:00:00Z');
+    answer = 'Через час у вас встреча.';
+    expect(await env.ctx.checkins.maybeRun(now)).toBe(true);
+    await waitFor(async () => (await thread(h, id)).length > 0);
+    expect(await thread(h, id)).toEqual([expect.objectContaining({ role: 'assistant', content: '🔔 Через час у вас встреча.', provider: 'polaris-checkin' })]);
+    await waitFor(async () => !(env.ctx.checkins as unknown as { running: boolean }).running);
+    const subs = (await env.app.inject({ url: '/api/conversations?kind=task', headers: h })).json().conversations;
+    expect(subs).toHaveLength(0); // временный контекст проверки удалён
+
+    now = new Date('2026-07-01T23:30:00Z'); // тихие часы
+    await waitFor(async () => !(env.ctx.checkins as unknown as { running: boolean }).running);
+    expect(await env.ctx.checkins.maybeRun(now)).toBe(false);
+  });
+
+  it('задача-наблюдатель молчит при «НЕТ ИЗМЕНЕНИЙ» и сообщает, когда есть событие', async () => {
+    let result = 'НЕТ ИЗМЕНЕНИЙ';
+    env = await createTestEnv({ script: () => ({ content: result }) });
+    const h = await login(env.app);
+    const id = await mainOf(h);
+    const run = async () => {
+      const t = (await env.app.inject({ method: 'POST', url: '/api/tasks', headers: h, payload: { goal: 'Следи за ценой' } })).json().item.id;
+      await waitFor(async () => (await env.ctx.tasks.get(t)).status === 'done');
+    };
+    await run();
+    expect(await thread(h, id)).toHaveLength(0);
+    expect((await env.app.inject({ url: '/api/notifications', headers: h })).json().items).toHaveLength(0);
+
+    result = 'Цена упала до 100.';
+    await run();
+    expect((await thread(h, id)).at(-1)!.content).toContain('Цена упала до 100.');
+  });
+
+  it('«повторить» и «изменить»: убирают последний ход; поиск по ленте со сниппетом', async () => {
+    let n = 0;
+    env = await createTestEnv({ script: () => ({ content: `ответ ${++n}` }) });
+    const h = await login(env.app);
+    const id = await mainOf(h);
+    await sendTo(h, id, 'расскажи про зелёный чай подробно');
+    expect((await thread(h, id)).map((m) => m.content)).toEqual(['расскажи про зелёный чай подробно', 'ответ 1']);
+
+    const again = await env.app.inject({ method: 'POST', url: `/api/conversations/${id}/regenerate`, headers: h });
+    expect(again.statusCode).toBe(202);
+    await env.ctx.runs.idle();
+    expect((await thread(h, id)).map((m) => m.content)).toEqual(['расскажи про зелёный чай подробно', 'ответ 2']);
+
+    const found = (await env.app.inject({ url: `/api/conversations/${id}/search?q=${encodeURIComponent('ЗЕЛЁНЫЙ чай')}`, headers: h })).json().results;
+    expect(found).toHaveLength(1);
+    expect(found[0].snippet).toContain('зелёный чай');
+    const short = await env.app.inject({ url: `/api/conversations/${id}/search?q=a`, headers: h });
+    expect(short.statusCode).toBe(400);
+
+    const edit = await env.app.inject({ method: 'POST', url: `/api/conversations/${id}/rewind`, headers: h });
+    expect(edit.json()).toEqual({ content: 'расскажи про зелёный чай подробно' });
+    expect(await thread(h, id)).toHaveLength(0);
+    const empty = await env.app.inject({ method: 'POST', url: `/api/conversations/${id}/rewind`, headers: h });
+    expect(empty.statusCode).toBe(409);
+  });
+
+  it('при сбое ChatGPT чат получает понятную подсказку, что делать', async () => {
+    const { ProviderError } = await import('../src/providers/types.js');
+    env = await createTestEnv({ script: () => new ProviderError('chatgpt', 'auth', 'chatgpt: 401', 401) });
+    const h = await login(env.app);
+    const id = await mainOf(h);
+    await sendTo(h, id, 'привет');
+    expect((await thread(h, id)).at(-1)!.content).toContain('Подключите его заново');
+  });
+});

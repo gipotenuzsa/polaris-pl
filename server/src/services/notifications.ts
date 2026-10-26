@@ -56,6 +56,7 @@ export class NotificationsService {
       url: urlForNotification(dto.kind, dto.ref as { conversationId?: string; taskId?: string } | undefined),
       tag: dto.id,
       urgent: dto.kind === 'approval' || dto.kind === 'reminder',
+      approvalId: dto.kind === 'approval' ? (dto.ref?.approvalId as string | undefined) : undefined,
     });
     return dto;
   }

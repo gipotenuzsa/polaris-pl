@@ -7,6 +7,7 @@ export interface TickResult {
   approvalsExpired: number;
   tasksStarted: number;
   morningStarted: boolean;
+  checkinStarted?: boolean;
 }
 
 /**
@@ -49,10 +50,11 @@ export class Scheduler {
       const remindersFired = await app.reminders.fireDue(now);
       const approvalsExpired = await app.approvals.expireStale(now);
       const morningStarted = await app.morning.maybeRun(now);
+      const checkinStarted = await app.checkins.maybeRun(now);
       const free = app.config.scheduler.maxConcurrentRuns - app.runs.activeCount();
       const due = await app.tasks.claimDue(now, free);
       for (const task of due) app.tasks.start(task);
-      return { remindersFired, approvalsExpired, tasksStarted: due.length, morningStarted };
+      return { remindersFired, approvalsExpired, tasksStarted: due.length, morningStarted, checkinStarted };
     } finally {
       this.ticking = false;
     }

@@ -82,6 +82,52 @@ export function chatRoutes(app: FastifyInstance, ctx: AppContext): void {
     return { stopped: ctx.runs.stop(id) };
   });
 
+  /** Повторить ответ на последнее сообщение пользователя. */
+  app.post('/api/conversations/:id/regenerate', async (req, reply) => {
+    const { id } = parse(idParams, req.params);
+    await ctx.conversations.get(id);
+    if (ctx.runs.isRunning(id)) throw conflict('Агент ещё отвечает', 'busy');
+    if ((await ctx.conversations.pendingToolCount(id)) > 0) throw conflict('Сначала решите по ожидающему действию', 'pending_approval');
+    const last = await ctx.conversations.rewind(id, true);
+    if (!last) throw conflict('Нечего повторять', 'empty');
+    ctx.runs.startChat(id);
+    reply.code(202);
+    return { running: true };
+  });
+
+  /** Изменить последнее сообщение: убирает его вместе с ответом и возвращает текст для правки. */
+  app.post('/api/conversations/:id/rewind', async (req) => {
+    const { id } = parse(idParams, req.params);
+    await ctx.conversations.get(id);
+    if (ctx.runs.isRunning(id)) throw conflict('Агент ещё отвечает', 'busy');
+    if ((await ctx.conversations.pendingToolCount(id)) > 0) throw conflict('Сначала решите по ожидающему действию', 'pending_approval');
+    const last = await ctx.conversations.rewind(id, false);
+    if (!last) throw conflict('Нечего менять', 'empty');
+    return { content: last.content };
+  });
+
+  /** Поиск по ленте: реплики пользователя и Polaris со сниппетом вокруг совпадения. */
+  app.get('/api/conversations/:id/search', async (req) => {
+    const { id } = parse(idParams, req.params);
+    const { q } = parse(z.object({ q: z.string().trim().min(2).max(200) }), req.query);
+    await ctx.conversations.get(id);
+    const rows = await ctx.conversations.searchMessages(id, q, 30);
+    return {
+      results: rows.map((r) => {
+        const flat = r.content.replace(/\s+/g, ' ').trim();
+        const at = Math.max(0, flat.toLowerCase().indexOf(q.toLowerCase()));
+        const from = Math.max(0, at - 60);
+        return {
+          id: r.id,
+          seq: r.seq,
+          role: r.role,
+          createdAt: new Date(r.created_at).toISOString(),
+          snippet: `${from > 0 ? '…' : ''}${flat.slice(from, from + 200)}${flat.length > from + 200 ? '…' : ''}`,
+        };
+      }),
+    };
+  });
+
   app.patch('/api/conversations/:id', async (req) => {
     const { id } = parse(idParams, req.params);
     const { title, pinned } = parse(

@@ -18,6 +18,15 @@ export const morningSchema = z.object({
 });
 export type MorningSettings = z.infer<typeof morningSchema> & { lastRunDate?: string };
 
+export const checkinsSchema = z.object({
+  enabled: z.boolean(),
+  everyHours: z.number().int().min(1).max(48),
+  quietFrom: z.string().refine((v) => parseHHMM(v) !== null, 'Ожидается время HH:MM'),
+  quietTo: z.string().refine((v) => parseHHMM(v) !== null, 'Ожидается время HH:MM'),
+  timezone: z.string().refine(isValidTimeZone, 'Неизвестный часовой пояс'),
+});
+export type CheckinsSettings = z.infer<typeof checkinsSchema> & { lastRunAt?: string };
+
 export const agentSchema = z.object({
   instructions: z.string().max(4000),
 });
@@ -57,6 +66,16 @@ export class SettingsService {
     return this.get<MorningSettings>('morning', {
       enabled: false,
       time: '08:00',
+      timezone: this.ctx.config.timezone,
+    });
+  }
+
+  getCheckins(): Promise<CheckinsSettings> {
+    return this.get<CheckinsSettings>('checkins', {
+      enabled: false,
+      everyHours: 3,
+      quietFrom: '22:00',
+      quietTo: '08:00',
       timezone: this.ctx.config.timezone,
     });
   }

@@ -46,6 +46,17 @@ const MAX_IMAGE_MESSAGES = 3;
  * Состояние целиком живёт в таблице messages, поэтому цикл можно остановить на подтверждении
  * и продолжить позже (или после перезапуска сервера) тем же вызовом.
  */
+/** Понятная подсказка вместо технического текста: что случилось с ChatGPT и что делать. */
+function modelErrorHint(err: unknown): string {
+  if (err instanceof AllProvidersFailedError) {
+    const kinds = new Set(err.attempts.map((a) => a.kind));
+    if (kinds.has('auth')) return 'Сессия ChatGPT истекла или отозвана. Подключите его заново: Ещё → Настройки → ChatGPT.';
+    if (kinds.has('rate_limit')) return 'Достигнут лимит подписки ChatGPT. Попробуйте чуть позже.';
+    if (kinds.has('timeout')) return 'ChatGPT слишком долго не отвечал. Попробуйте ещё раз.';
+  }
+  return err instanceof AllProvidersFailedError ? err.message : errorMessage(err);
+}
+
 export async function runAgent(app: AppContext, opts: RunOptions): Promise<RunOutcome> {
   const { conversationId, taskId } = opts;
   const maxSteps = opts.maxSteps ?? app.config.agent.maxSteps;
@@ -122,7 +133,7 @@ export async function runAgent(app: AppContext, opts: RunOptions): Promise<RunOu
         return { status: 'failed', error: 'Остановлено' };
       }
       const message = err instanceof AllProvidersFailedError ? err.message : errorMessage(err);
-      await say(`⚠️ Не удалось получить ответ модели. ${message}`);
+      await say(`⚠️ Не удалось получить ответ модели. ${modelErrorHint(err)}`);
       return { status: 'failed', error: message };
     }
 

@@ -4,7 +4,9 @@ import type { ProviderChain } from './providers/chain.js';
 import type { ChatGptAuth } from './providers/chatgpt/auth.js';
 import type { ActionsService } from './services/actions.js';
 import type { ApprovalsService } from './services/approvals.js';
+import type { BackupService } from './services/backup.js';
 import type { BudgetService } from './services/budget.js';
+import type { CheckinsService } from './services/checkins.js';
 import type { CompactionService } from './services/compaction.js';
 import type { ConversationService } from './services/conversations.js';
 import type { MemoryService } from './services/memory.js';
@@ -46,6 +48,8 @@ export interface AppContext {
   push: PushService;
   conversations: ConversationService;
   compaction: CompactionService;
+  backup: BackupService;
+  checkins: CheckinsService;
   runs: RunManager;
   tasks: TaskService;
   morning: MorningService;

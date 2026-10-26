@@ -10,7 +10,9 @@ import { ChatGptProvider } from './providers/chatgpt/provider.js';
 import type { ModelProvider } from './providers/types.js';
 import { ActionsService } from './services/actions.js';
 import { ApprovalsService } from './services/approvals.js';
+import { BackupService } from './services/backup.js';
 import { BudgetService } from './services/budget.js';
+import { CheckinsService } from './services/checkins.js';
 import { CompactionService } from './services/compaction.js';
 import { ConversationService } from './services/conversations.js';
 import { MemoryService } from './services/memory.js';
@@ -88,6 +90,8 @@ export async function createContext(opts: BootstrapOptions): Promise<AppContext>
   ctx.push = new PushService(ctx, opts.pushSender);
   ctx.conversations = new ConversationService(ctx);
   ctx.compaction = new CompactionService(ctx);
+  ctx.backup = new BackupService(ctx);
+  ctx.checkins = new CheckinsService(ctx);
   ctx.runs = new RunManager(ctx);
   ctx.tasks = new TaskService(ctx);
   ctx.morning = new MorningService(ctx);

@@ -1,7 +1,7 @@
 import type { AppContext } from '../context.js';
 import { json, queryOne } from '../db/types.js';
 import type { ChatMessage, ImagePart, ToolCall } from '../providers/types.js';
-import { notFound } from '../util/errors.js';
+import { conflict, notFound } from '../util/errors.js';
 
 export type ConversationKind = 'chat' | 'task' | 'summary';
 export type MessageRole = 'user' | 'assistant' | 'tool' | 'system';
@@ -216,6 +216,25 @@ export class ConversationService {
     const row = await queryOne<ConversationRow>(this.ctx.db, 'select * from conversations where id = $1', [id]);
     if (!row) throw notFound('Чат не найден');
     return toConversationDto(row);
+  }
+
+  /**
+   * «Повторить» и «Изменить»: убирает последний ход. keepUser=true — оставляет реплику пользователя (ответ будет
+   * сгенерирован заново); false — удаляет и её (текст возвращается, чтобы поправить и отправить заново).
+   */
+  async rewind(id: string, keepUser: boolean): Promise<{ content: string } | null> {
+    const last = await queryOne<{ seq: number; content: string }>(
+      this.ctx.db,
+      `select seq, content from messages where conversation_id = $1 and role = 'user' order by seq desc limit 1`,
+      [id],
+    );
+    if (!last) return null;
+    const { upto } = await this.summaryState(id);
+    if (last.seq <= upto) throw conflict('Это сообщение уже вошло в сводку — изменить его нельзя', 'compacted');
+    await this.ctx.db.query('delete from messages where conversation_id = $1 and seq > $2', [id, last.seq]);
+    if (!keepUser) await this.ctx.db.query('delete from messages where conversation_id = $1 and seq = $2', [id, last.seq]);
+    await this.ctx.db.query('update conversations set updated_at = now() where id = $1', [id]);
+    return { content: last.content };
   }
 
   async setPinned(id: string, pinned: boolean): Promise<void> {

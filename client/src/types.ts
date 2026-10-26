@@ -166,6 +166,23 @@ export interface MorningSettings {
   lastRunDate?: string;
 }
 
+export interface CheckinsSettings {
+  enabled: boolean;
+  everyHours: number;
+  quietFrom: string;
+  quietTo: string;
+  timezone: string;
+  lastRunAt?: string;
+}
+
+export interface SearchHit {
+  id: string;
+  seq: number;
+  role: 'user' | 'assistant';
+  createdAt: string;
+  snippet: string;
+}
+
 export interface ServerStatus {
   version: string;
   uptimeSeconds: number;

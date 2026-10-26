@@ -2,7 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { parse } from '../auth/auth.js';
 import type { AppContext } from '../context.js';
-import { agentSchema, budgetSchema, chatgptSettingsSchema, morningSchema } from '../services/settings.js';
+import { agentSchema, budgetSchema, checkinsSchema, chatgptSettingsSchema, morningSchema } from '../services/settings.js';
 import { scheduleSchema } from '../tools/tasksTools.js';
 
 const idParams = z.object({ id: z.string().uuid() });
@@ -60,6 +60,7 @@ export function agentRoutes(app: FastifyInstance, ctx: AppContext): void {
   // ── Настройки агента и сводки ─────────────────────────────────────────────
   app.get('/api/settings', async () => ({
     morning: await ctx.settings.getMorning(),
+    checkins: await ctx.settings.getCheckins(),
     agent: await ctx.settings.getAgent(),
     timezone: ctx.config.timezone,
   }));
@@ -70,6 +71,16 @@ export function agentRoutes(app: FastifyInstance, ctx: AppContext): void {
     await ctx.settings.set('morning', { ...b, lastRunDate: cur.lastRunDate });
     return { morning: await ctx.settings.getMorning() };
   });
+
+  app.put('/api/settings/checkins', async (req) => {
+    const b = parse(checkinsSchema, req.body);
+    const cur = await ctx.settings.getCheckins();
+    await ctx.settings.set('checkins', { ...b, lastRunAt: cur.lastRunAt });
+    return { checkins: await ctx.settings.getCheckins() };
+  });
+
+  /** «Проверить сейчас»: выполняет проверку немедленно (ждёт результата). */
+  app.post('/api/checkins/run', async () => ctx.checkins.run());
 
   app.put('/api/settings/agent', async (req) => {
     await ctx.settings.set('agent', parse(agentSchema, req.body));

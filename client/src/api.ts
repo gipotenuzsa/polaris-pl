@@ -8,6 +8,7 @@ import type {
   BudgetLimits,
   BudgetSummary,
   ChatGptStatus,
+  CheckinsSettings,
   Conversation,
   FileEntry,
   MemoryItem,
@@ -16,6 +17,7 @@ import type {
   Note,
   ProviderStatus,
   Schedule,
+  SearchHit,
   ServerStatus,
   Task,
   TaskStep,
@@ -99,6 +101,23 @@ function authInit(init: RequestInit = {}): RequestInit {
   return { ...init, headers, credentials: usesCookies() ? 'same-origin' : 'omit' };
 }
 
+/** Веб: скачивает резервную копию данных файлом (с авторизацией сессии). */
+export async function downloadBackup(): Promise<void> {
+  let res: Response;
+  try {
+    res = await fetch(`${baseUrl}/api/backup`, authInit());
+  } catch {
+    throw new ApiError('Нет связи с сервером', 0, 'network');
+  }
+  if (!res.ok) throw new ApiError(`Ошибка ${res.status}`, res.status);
+  const blob = await res.blob();
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `polaris-backup-${new Date().toISOString().slice(0, 10)}.json`;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 10_000);
+}
+
 /** Адрес картинки-вложения и заголовки авторизации (в вебе с cookie заголовки не нужны). */
 export function attachmentSource(id: string): { uri: string; headers?: Record<string, string> } {
   const uri = `${baseUrl}/api/attachments/${id}`;
@@ -173,6 +192,7 @@ const post = <T>(path: string, body?: unknown) => request<T>(path, { method: 'PO
 const put = <T>(path: string, body: unknown) => request<T>(path, { method: 'PUT', body });
 const patch = <T>(path: string, body: unknown) => request<T>(path, { method: 'PATCH', body });
 const del = <T>(path: string) => request<T>(path, { method: 'DELETE' });
+const q_ = (params: Record<string, string | number | boolean | undefined>) => q(params);
 const q = (params: Record<string, string | number | boolean | undefined>) => {
   const s = Object.entries(params)
     .filter(([, v]) => v !== undefined)
@@ -247,7 +267,15 @@ export const api = {
   budget: () => get<BudgetSummary>('/api/budget'),
   saveBudget: (limits: BudgetLimits) => put<BudgetSummary>('/api/budget', limits),
 
-  settings: () => get<{ morning: MorningSettings; agent: { instructions: string }; timezone: string }>('/api/settings'),
+  settings: () =>
+    get<{ morning: MorningSettings; checkins: CheckinsSettings; agent: { instructions: string }; timezone: string }>('/api/settings'),
+  saveCheckins: (c: Omit<CheckinsSettings, 'lastRunAt'>) => put<{ checkins: CheckinsSettings }>('/api/settings/checkins', c),
+  runCheckin: () => post<{ posted: boolean; text?: string }>('/api/checkins/run'),
+  regenerate: (id: string) => post<{ running: boolean }>(`/api/conversations/${id}/regenerate`),
+  rewind: (id: string) => post<{ content: string }>(`/api/conversations/${id}/rewind`),
+  searchConversation: (id: string, q: string) =>
+    get<{ results: SearchHit[] }>(`/api/conversations/${id}/search${q_({ q })}`),
+  restoreBackup: (backup: unknown) => post<{ ok: true; counts: Record<string, number> }>('/api/backup/restore', { replace: true, backup }),
   saveMorning: (m: { enabled: boolean; time: string; timezone: string }) =>
     put<{ morning: MorningSettings }>('/api/settings/morning', m),
   saveAgent: (instructions: string) =>
