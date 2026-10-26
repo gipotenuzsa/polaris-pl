@@ -74,12 +74,24 @@ export class BackupService {
         if (!Array.isArray(rows)) throw badRequest(`Таблица ${t.name} в копии повреждена`);
         const list = (t.name === 'settings' ? rows.filter((r) => !SKIP_SETTINGS.includes(String((r as { key?: string }).key))) : rows) as unknown[];
         const size = 'batch' in t ? t.batch : 200;
+        const known = new Set(
+          (
+            await tx.query<{ column_name: string }>(
+              `select column_name from information_schema.columns where table_schema = current_schema() and table_name = $1`,
+              [t.name],
+            )
+          ).map((c) => c.column_name),
+        );
         for (let i = 0; i < list.length; i += size) {
-          const chunk = list.slice(i, i + size);
-          // jsonb_populate_recordset берёт только известные колонки таблицы — лишние поля из файла игнорируются
+          const chunk = list.slice(i, i + size) as Record<string, unknown>[];
+          // Берём только колонки, которые есть и в таблице, и в каждой строке файла: недостающие (копия из более
+          // старой версии) получат значения по умолчанию, лишние поля из файла игнорируются.
+          const cols = Object.keys(chunk[0] ?? {}).filter((k) => known.has(k) && chunk.every((r) => k in r));
+          if (cols.length === 0) continue;
+          const list_ = cols.map((c) => `"${c}"`).join(', ');
           await tx.query(
-            `insert into ${t.name} ${'identity' in t ? 'overriding system value' : ''}
-             select * from jsonb_populate_recordset(null::${t.name}, $1::jsonb)`,
+            `insert into ${t.name} (${list_}) ${'identity' in t && cols.includes(t.identity) ? 'overriding system value' : ''}
+             select ${list_} from jsonb_populate_recordset(null::${t.name}, $1::jsonb)`,
             [JSON.stringify(chunk)],
           );
         }

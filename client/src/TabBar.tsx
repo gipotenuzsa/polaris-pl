@@ -3,6 +3,7 @@ import { useRouter, type Tabs } from 'expo-router';
 import { useEffect, useState, type ComponentProps } from 'react';
 import { Animated, Platform, Pressable, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useKeyboardOpen } from './keyboard';
 import { useStatus } from './status';
 import { colors, shadow } from './theme';
 import type { IconName } from './ui';
@@ -24,6 +25,7 @@ const PAD = 5;
 export function TabBar({ state }: TabBarProps) {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const keyboardOpen = useKeyboardOpen();
   const { approvals } = useStatus();
   const [width, setWidth] = useState(0);
   const [slide] = useState(() => new Animated.Value(0));
@@ -37,13 +39,14 @@ export function TabBar({ state }: TabBarProps) {
     Animated.spring(slide, { toValue: index * itemW, speed: 22, bounciness: 7, useNativeDriver: Platform.OS !== 'web' }).start();
   }, [index, itemW, slide]);
 
+  if (keyboardOpen) return null; // клавиатура открыта — место нужнее ленте и полю ввода
   return (
     <View
       style={{
         backgroundColor: colors.bg,
         alignItems: 'center',
-        paddingTop: 6,
-        paddingBottom: Math.max(insets.bottom, 10) + 4,
+        paddingTop: 2,
+        paddingBottom: Math.max(insets.bottom - 6, 8),
         paddingHorizontal: 16,
       }}
     >
@@ -55,7 +58,7 @@ export function TabBar({ state }: TabBarProps) {
             width: '100%',
             maxWidth: 420,
             padding: PAD,
-            borderRadius: 30,
+            borderRadius: 28,
             backgroundColor: colors.surface,
             borderWidth: 1,
             borderColor: colors.border,
@@ -90,7 +93,7 @@ export function TabBar({ state }: TabBarProps) {
               onPress={() => {
                 if (!focused) router.navigate(item.name === 'index' ? '/' : item.name === 'tasks' ? '/tasks' : '/memory');
               }}
-              style={{ flex: 1, height: 52, alignItems: 'center', justifyContent: 'center' }}
+              style={{ flex: 1, height: 48, alignItems: 'center', justifyContent: 'center' }}
             >
               <View>
                 <Ionicons

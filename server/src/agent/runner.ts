@@ -115,13 +115,18 @@ export async function runAgent(app: AppContext, opts: RunOptions): Promise<RunOu
     const meta = await app.conversations.attachmentMeta(userIds);
     const withImages = userIds.filter((id) => meta.has(id)).slice(-MAX_IMAGE_MESSAGES);
     const images = await app.conversations.attachmentImages(withImages);
-    const messages = buildMessages(system, rows, app.config.agent.contextTokens, { images, meta });
+    // Последний допустимый шаг: инструменты не даём, модель обязана ответить итогом по найденному, а не упереться в лимит.
+    const lastStep = step === maxSteps - 1 && maxSteps > 1;
+    const stepSystem = lastStep
+      ? `${system}\n\nЭто последний шаг: инструменты недоступны. Ответь итогом по тому, что уже найдено, и честно назови, чего не хватило.`
+      : system;
+    const messages = buildMessages(stepSystem, rows, app.config.agent.contextTokens, { images, meta });
 
     let resp;
     try {
       resp = await app.providers.chat({
         messages,
-        tools: specs,
+        tools: lastStep ? [] : specs,
         maxTokens: Math.min(MAX_OUTPUT_TOKENS, remaining ?? MAX_OUTPUT_TOKENS),
         signal: opts.signal,
         onText: opts.onText,

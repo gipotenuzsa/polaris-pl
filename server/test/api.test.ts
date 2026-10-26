@@ -960,6 +960,26 @@ describe('резервная копия, проверки, наблюдател�
     expect((await thread(h, id)).at(-2)!.content).toBe('после восстановления');
   });
 
+  it('копия из старой версии (без новых колонок) восстанавливается: недостающие поля получают значения по умолчанию', async () => {
+    env = await createTestEnv({ script: () => ({ content: 'ок' }) });
+    const h = await login(env.app);
+    const old = {
+      format: 'polaris-backup',
+      version: 1,
+      createdAt: '2026-01-01T00:00:00.000Z',
+      tables: {
+        conversations: [{ id: '11111111-1111-4111-8111-111111111111', title: 'Старый чат', kind: 'chat', created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-01T00:00:00Z' }],
+        messages: [{ id: '22222222-2222-4222-8222-222222222222', seq: 7, conversation_id: '11111111-1111-4111-8111-111111111111', role: 'user', content: 'привет', created_at: '2026-01-01T00:00:01Z', лишнее: 1 }],
+      },
+    };
+    const res = await env.app.inject({ method: 'POST', url: '/api/backup/restore', headers: h, payload: { replace: true, backup: old } });
+    expect(res.statusCode).toBe(200);
+    const list = (await env.app.inject({ url: '/api/conversations', headers: h })).json().conversations;
+    expect(list[0]).toMatchObject({ title: 'Старый чат', pinned: false, isMain: false });
+    const conv = (await env.app.inject({ url: '/api/conversations/11111111-1111-4111-8111-111111111111', headers: h })).json();
+    expect(conv.messages[0]).toMatchObject({ seq: 7, content: 'привет', status: 'ok' });
+  });
+
   it('проверки: молчат, когда сообщать нечего; пишут в разговор, когда есть что; уважают тихие часы и интервал', async () => {
     let answer = 'НИЧЕГО';
     let now = new Date('2026-07-01T12:00:00Z');
@@ -1049,5 +1069,46 @@ describe('резервная копия, проверки, наблюдател�
     const id = await mainOf(h);
     await sendTo(h, id, 'привет');
     expect((await thread(h, id)).at(-1)!.content).toContain('Подключите его заново');
+  });
+});
+
+describe('лимит шагов и неудачи инструментов', () => {
+  const run = async (h: Record<string, string>, text: string) => {
+    const id = (await env.app.inject({ url: '/api/main', headers: h })).json().conversation.id as string;
+    const res = await env.app.inject({ method: 'POST', url: `/api/conversations/${id}/messages`, headers: h, payload: { content: text } });
+    expect(res.statusCode).toBe(202);
+    await env.ctx.runs.idle();
+    return (await env.app.inject({ url: `/api/conversations/${id}`, headers: h })).json().messages as {
+      role: string;
+      content: string;
+      status: string;
+      toolName?: string;
+    }[];
+  };
+
+  it('на последнем шаге инструменты не даются: модель обязана ответить итогом, а не упереться в лимит', async () => {
+    env = await createTestEnv({
+      config: { AGENT_MAX_STEPS: '2' },
+      script: (req) => (req.tools && req.tools.length > 0 ? { toolCalls: [toolCall('get_time', {}, 't1')] } : { content: 'итог без инструментов' }),
+    });
+    const msgs = await run(await login(env.app), 'что по времени?');
+    expect(msgs.at(-1)).toMatchObject({ role: 'assistant', content: 'итог без инструментов' });
+    expect(msgs.some((m) => m.content.includes('Достигнут лимит шагов'))).toBe(false);
+  });
+
+  it('неудавшийся research показывается как ошибка инструмента, а не как успех', async () => {
+    env = await createTestEnv({
+      config: { AGENT_MAX_STEPS: '1' },
+      script: (req) => {
+        const sys = String(req.messages[0]!.content);
+        if (sys.includes('субагент-исследователь')) return { toolCalls: [toolCall('get_time', {}, 'g1')] }; // упирается в лимит
+        const last = req.messages.at(-1)!;
+        return last.role === 'tool' ? { content: 'не вышло' } : { toolCalls: [toolCall('research', { question: 'Что нового в теме?' }, 'r1')] };
+      },
+    });
+    const msgs = await run(await login(env.app), 'исследуй');
+    const tool = msgs.find((m) => m.toolName === 'research');
+    expect(tool).toMatchObject({ status: 'error' });
+    expect(tool!.content).toContain('Исследование не удалось');
   });
 });

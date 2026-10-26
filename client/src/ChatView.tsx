@@ -10,6 +10,7 @@ import { MAX_PICKS, pickImages, picksFromFiles, previewUri, type Picked } from '
 import { shorten } from './format';
 import { Header } from './Header';
 import { useLoad } from './hooks';
+import { useKeyboardOpen } from './keyboard';
 import { Markdown } from './Markdown';
 import { FadeIn, PressScale, TypingDots } from './motion';
 import { useStatus } from './status';
@@ -284,6 +285,7 @@ export function ChatView({ id, main = false }: { id: string; main?: boolean }) {
   const [listening, setListening] = useState(false);
   const recRef = useRef<SpeechRec | null>(null);
   const status = useLoad(() => (main ? api.status() : Promise.resolve(null)));
+  const keyboardOpen = useKeyboardOpen();
   const [loadingMore, setLoadingMore] = useState(false);
   const [text, setText] = useState('');
   const [sending, setSending] = useState(false);
@@ -291,6 +293,20 @@ export function ChatView({ id, main = false }: { id: string; main?: boolean }) {
   const [viewing, setViewing] = useState<Attachment | null>(null);
   const list = useRef<FlatList<Message>>(null);
   const lastCount = useRef('');
+  /** Пользователь у конца ленты: новые сообщения и стриминг подкручивают её вниз; если он листает вверх — не трогаем. */
+  const atBottom = useRef(true);
+  /** Прокрутка к концу ленты. На вебе scrollToEnd у FlatList бывает no-op при неизвестной высоте строк — дублируем прямой прокруткой DOM-узла. */
+  const toEnd = (animated: boolean) => {
+    const l = list.current;
+    if (!l) return;
+    l.scrollToEnd({ animated });
+    if (Platform.OS === 'web') {
+      const node = (l as unknown as { getScrollableNode?: () => HTMLElement | null }).getScrollableNode?.();
+      if (node) node.scrollTop = node.scrollHeight;
+    }
+  };
+  /** Первую секунду после загрузки события прокрутки не считаем действиями пользователя (лента ещё достраивается). */
+  const initialising = useRef(true);
   const picksRef = useRef<Picked[]>([]);
   useEffect(() => {
     picksRef.current = picks;
@@ -352,6 +368,7 @@ export function ChatView({ id, main = false }: { id: string; main?: boolean }) {
 
   const openHit = async (h: SearchHit) => {
     setSearchOpen(false);
+    atBottom.current = false; // идём к найденному месту, а не к концу
     try {
       const d = await api.conversation(id, { limit: PAGE, before: h.seq + 25 });
       for (const m of d.messages) store.current.set(m.id, m);
@@ -490,12 +507,31 @@ export function ChatView({ id, main = false }: { id: string; main?: boolean }) {
   useEffect(() => {
     if (lastId !== lastCount.current) {
       lastCount.current = lastId;
-      setTimeout(() => list.current?.scrollToEnd({ animated: true }), 60);
+      if (atBottom.current) setTimeout(() => toEnd(true), 60);
     }
   }, [lastId]);
 
+  // После первой загрузки несколько раз подтверждаем «конец ленты»: разметка, формулы и картинки доезжают с задержкой.
+  const settled = useRef(false);
+  const hasMessages = messages.length > 0;
   useEffect(() => {
-    if (liveText) list.current?.scrollToEnd({ animated: false });
+    if (!hasMessages || settled.current) return;
+    settled.current = true;
+    const timers = [120, 400, 1000].map((ms) =>
+      setTimeout(() => {
+        if (atBottom.current) toEnd(false);
+      }, ms),
+    );
+    timers.push(
+      setTimeout(() => {
+        initialising.current = false; // дальше положение ленты определяет сам пользователь
+      }, 1100),
+    );
+    return () => timers.forEach(clearTimeout);
+  }, [hasMessages]);
+
+  useEffect(() => {
+    if (liveText && atBottom.current) toEnd(false);
   }, [liveText]);
 
   const send = async (override?: string) => {
@@ -503,6 +539,7 @@ export function ChatView({ id, main = false }: { id: string; main?: boolean }) {
     const files = override ? [] : picks;
     if ((!content && files.length === 0) || sending || running || blocked) return;
     setSending(true);
+    atBottom.current = true; // после отправки показываем конец ленты
     setText('');
     setPicks([]);
     try {
@@ -562,6 +599,24 @@ export function ChatView({ id, main = false }: { id: string; main?: boolean }) {
           data={messages}
           keyExtractor={(m) => m.id}
           style={{ width: '100%' }}
+          scrollEventThrottle={64}
+          onLayout={() => {
+            if (atBottom.current) toEnd(false); // высота списка изменилась (баннер, клавиатура)
+          }}
+          onScroll={(e) => {
+            if (initialising.current) return;
+            const { contentOffset, contentSize, layoutMeasurement } = e.nativeEvent;
+            atBottom.current = contentSize.height - layoutMeasurement.height - contentOffset.y < 160;
+          }}
+          // Контент ленты (разметка, формулы, картинки) дорисовывается после первого кадра: пока читаем конец, держим его на экране.
+          // Так после перезапуска приложения лента открывается внизу, а не прыгает к началу.
+          onContentSizeChange={() => {
+            if (atBottom.current) toEnd(false);
+          }}
+          // Рендерим сразу всю загруженную страницу: иначе высота ленты оценивается приблизительно и «конец» оказывается не там.
+          initialNumToRender={PAGE + 20}
+          windowSize={31}
+          maxToRenderPerBatch={PAGE}
           onScrollToIndexFailed={(info) => {
             list.current?.scrollToOffset({ offset: info.averageItemLength * info.index, animated: true });
             setTimeout(() => list.current?.scrollToIndex({ index: info.index, viewPosition: 0.3, animated: true }), 400);
@@ -657,7 +712,7 @@ export function ChatView({ id, main = false }: { id: string; main?: boolean }) {
             Ждёт вашего решения — одобрите или отклоните действие выше.
           </Text>
         ) : null}
-        <View style={[{ paddingHorizontal: space.md, paddingBottom: space.sm, paddingTop: 4 }, WIDE]}>
+        <View style={[{ paddingHorizontal: space.md, paddingBottom: keyboardOpen ? 6 : space.xs, paddingTop: 4 }, WIDE]}>
           {picks.length ? (
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 4, paddingBottom: space.sm }}>
               {picks.map((pk) => (
