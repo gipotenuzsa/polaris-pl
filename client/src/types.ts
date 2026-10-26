@@ -8,6 +8,12 @@ export interface Conversation {
   updatedAt: string;
 }
 
+export interface Attachment {
+  id: string;
+  name: string;
+  mime: string;
+}
+
 export interface Message {
   id: string;
   seq: number;
@@ -21,6 +27,7 @@ export interface Message {
   approvalId?: string;
   provider?: string;
   model?: string;
+  attachments?: Attachment[];
   createdAt: string;
 }
 

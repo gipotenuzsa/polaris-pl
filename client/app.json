@@ -37,7 +37,19 @@
       "backgroundColor": "#F5F0E6",
       "themeColor": "#F5F0E6"
     },
-    "plugins": ["expo-router", "expo-secure-store", "expo-web-browser", "expo-font"],
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      "expo-web-browser",
+      "expo-font",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Polaris использует фото, чтобы вы могли прикрепить их к сообщению.",
+          "cameraPermission": "Polaris использует камеру, чтобы вы могли сфотографировать и отправить снимок."
+        }
+      ]
+    ],
     "extra": {
       "router": {}
     }

@@ -2,17 +2,18 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
 import { Stack, useLocalSearchParams } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, FlatList, KeyboardAvoidingView, Platform, Pressable, Text, TextInput, View } from 'react-native';
+import { Animated, FlatList, Image, KeyboardAvoidingView, Modal, Platform, Pressable, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { api } from '../../src/api';
+import { api, attachmentSource } from '../../src/api';
 import { ApprovalCard } from '../../src/ApprovalCard';
+import { MAX_PICKS, pickImages, picksFromFiles, previewUri, type Picked } from '../../src/attachments';
 import { shorten } from '../../src/format';
 import { useLoad } from '../../src/hooks';
 import { Markdown } from '../../src/Markdown';
 import { FadeIn, PressScale, TypingDots } from '../../src/motion';
 import { useStatus } from '../../src/status';
 import { colors, radius, shadow, space, toolLabel } from '../../src/theme';
-import type { Approval, Message } from '../../src/types';
+import type { Approval, Attachment, Message } from '../../src/types';
 import { ErrorNote, Loading, notify } from '../../src/ui';
 
 const STATUS_ICON = {
@@ -93,12 +94,31 @@ function CopyButton({ text }: { text: string }) {
   );
 }
 
-function Bubble({ m }: { m: Message }) {
+function Photos({ items, onOpen }: { items: Attachment[]; onOpen: (a: Attachment) => void }) {
+  const size = items.length === 1 ? 220 : 120;
+  return (
+    <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'flex-end', maxWidth: '86%', marginBottom: 4 }}>
+      {items.map((a) => (
+        <PressScale key={a.id} scale={0.98} onPress={() => onOpen(a)} style={{ margin: 3 }}>
+          <Image
+            source={attachmentSource(a.id)}
+            accessibilityLabel={a.name}
+            style={{ width: size, height: size, borderRadius: radius.md, backgroundColor: colors.surface2 }}
+            resizeMode="cover"
+          />
+        </PressScale>
+      ))}
+    </View>
+  );
+}
+
+function Bubble({ m, onOpen }: { m: Message; onOpen: (a: Attachment) => void }) {
   const mine = m.role === 'user';
-  if (!m.content) return null;
+  if (!m.content && !m.attachments?.length) return null;
   return (
     <FadeIn style={{ alignItems: mine ? 'flex-end' : 'flex-start', marginVertical: space.sm }}>
-      {mine ? (
+      {mine && m.attachments?.length ? <Photos items={m.attachments} onOpen={onOpen} /> : null}
+      {mine && !m.content ? null : mine ? (
         <View
           style={{
             maxWidth: '86%',
@@ -192,8 +212,14 @@ export default function ChatScreen() {
   const { refresh: refreshStatus } = useStatus();
   const [text, setText] = useState('');
   const [sending, setSending] = useState(false);
+  const [picks, setPicks] = useState<Picked[]>([]);
+  const [viewing, setViewing] = useState<Attachment | null>(null);
   const list = useRef<FlatList<Message>>(null);
   const lastCount = useRef(0);
+  const picksRef = useRef<Picked[]>([]);
+  useEffect(() => {
+    picksRef.current = picks;
+  }, [picks]);
 
   const { data, error, loading, refresh } = useLoad(
     () => api.conversation(id),
@@ -206,7 +232,30 @@ export default function ChatScreen() {
   const approvals = useMemo(() => new Map((data?.pendingApprovals ?? []).map((a) => [a.id, a])), [data]);
   const running = data?.running ?? false;
   const blocked = (data?.pendingApprovals.length ?? 0) > 0;
-  const canSend = !!text.trim() && !sending && !running && !blocked;
+  const canSend = (!!text.trim() || picks.length > 0) && !sending && !running && !blocked;
+  const room = MAX_PICKS - picks.length;
+
+  const addPicks = async (get: () => Promise<Picked[]>) => {
+    try {
+      const got = await get();
+      if (got.length) setPicks((p) => [...p, ...got].slice(0, MAX_PICKS));
+    } catch (e) {
+      notify('Не удалось добавить фото', e instanceof Error ? e.message : String(e));
+    }
+  };
+
+  // Вставка картинки из буфера обмена (веб): Ctrl+V со скриншотом или скопированным фото.
+  useEffect(() => {
+    if (Platform.OS !== 'web') return;
+    const onPaste = (e: ClipboardEvent) => {
+      const files = [...(e.clipboardData?.files ?? [])].filter((f) => f.type.startsWith('image/'));
+      if (!files.length) return;
+      e.preventDefault();
+      void addPicks(() => picksFromFiles(files, MAX_PICKS - picksRef.current.length));
+    };
+    document.addEventListener('paste', onPaste);
+    return () => document.removeEventListener('paste', onPaste);
+  }, []);
   const liveText = useSmoothText(running ? (data?.live ?? '') : '');
 
   const stop = async () => {
@@ -242,14 +291,19 @@ export default function ChatScreen() {
 
   const send = async (override?: string) => {
     const content = (override ?? text).trim();
-    if (!content || sending || running || blocked) return;
+    const files = override ? [] : picks;
+    if ((!content && files.length === 0) || sending || running || blocked) return;
     setSending(true);
     setText('');
+    setPicks([]);
     try {
-      await api.sendMessage(id, content);
+      const ids: string[] = [];
+      for (const f of files) ids.push((await api.uploadAttachment({ name: f.name, mime: f.mime, data: f.data })).attachment.id);
+      await api.sendMessage(id, content, ids);
       await refresh();
     } catch (e) {
       setText(content);
+      setPicks(files);
       notify('Не отправлено', e instanceof Error ? e.message : String(e));
     } finally {
       setSending(false);
@@ -322,7 +376,7 @@ export default function ChatScreen() {
                 onResolved={onResolved}
               />
             ) : item.role === 'system' ? null : (
-              <Bubble m={item} />
+              <Bubble m={item} onOpen={setViewing} />
             )
           }
           ListFooterComponent={
@@ -347,6 +401,33 @@ export default function ChatScreen() {
           </Text>
         ) : null}
         <View style={[{ paddingHorizontal: space.md, paddingBottom: space.sm, paddingTop: 4 }, WIDE]}>
+          {picks.length ? (
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 4, paddingBottom: space.sm }}>
+              {picks.map((pk) => (
+                <FadeIn key={pk.key} distance={4} style={{ marginRight: space.sm, marginBottom: 4 }}>
+                  <Image source={{ uri: previewUri(pk) }} style={{ width: 64, height: 64, borderRadius: radius.sm }} />
+                  <Pressable
+                    accessibilityLabel="Убрать фото"
+                    hitSlop={6}
+                    onPress={() => setPicks((all) => all.filter((x) => x.key !== pk.key))}
+                    style={{
+                      position: 'absolute',
+                      top: -6,
+                      right: -6,
+                      width: 20,
+                      height: 20,
+                      borderRadius: 10,
+                      backgroundColor: colors.ink,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <Ionicons name="close" size={13} color={colors.accentText} />
+                  </Pressable>
+                </FadeIn>
+              ))}
+            </View>
+          ) : null}
           <View
             style={[
               {
@@ -356,13 +437,28 @@ export default function ChatScreen() {
                 borderRadius: 26,
                 borderWidth: 1,
                 borderColor: colors.border,
-                paddingLeft: space.lg,
+                paddingLeft: 6,
                 paddingRight: 6,
                 paddingVertical: 6,
               },
               shadow,
             ]}
           >
+            <Pressable
+              accessibilityLabel="Прикрепить фото"
+              disabled={room <= 0 || blocked}
+              onPress={() => void addPicks(() => pickImages(room))}
+              style={{
+                width: 38,
+                height: 38,
+                borderRadius: 19,
+                alignItems: 'center',
+                justifyContent: 'center',
+                opacity: room <= 0 || blocked ? 0.35 : 1,
+              }}
+            >
+              <Ionicons name="image-outline" size={22} color={colors.muted} />
+            </Pressable>
             <TextInput
               value={text}
               onChangeText={setText}
@@ -385,6 +481,7 @@ export default function ChatScreen() {
                   color: colors.text,
                   paddingTop: 9,
                   paddingBottom: 9,
+                  paddingLeft: 4,
                   paddingRight: space.sm,
                   fontSize: 16,
                 },
@@ -395,6 +492,21 @@ export default function ChatScreen() {
           </View>
         </View>
       </KeyboardAvoidingView>
+      <Modal visible={!!viewing} transparent animationType="fade" onRequestClose={() => setViewing(null)}>
+        <Pressable
+          onPress={() => setViewing(null)}
+          style={{ flex: 1, backgroundColor: 'rgba(30,25,18,0.88)', alignItems: 'center', justifyContent: 'center', padding: space.lg }}
+        >
+          {viewing ? (
+            <Image
+              source={attachmentSource(viewing.id)}
+              accessibilityLabel={viewing.name}
+              resizeMode="contain"
+              style={{ width: '100%', height: '100%' }}
+            />
+          ) : null}
+        </Pressable>
+      </Modal>
     </SafeAreaView>
   );
 }

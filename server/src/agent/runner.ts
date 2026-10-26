@@ -39,6 +39,7 @@ export type RunOutcome =
   | { status: 'failed'; error: string };
 
 const MAX_OUTPUT_TOKENS = 8192;
+const MAX_IMAGE_MESSAGES = 3;
 
 /**
  * Цикл агента: модель → вызовы инструментов → результаты → модель…
@@ -93,7 +94,12 @@ export async function runAgent(app: AppContext, opts: RunOptions): Promise<RunOu
     }
 
     const remaining = await app.budget.remainingTokens(scope);
-    const messages = buildMessages(opts.system, rows, app.config.agent.contextTokens);
+    // Картинки отправляем модели только из нескольких последних сообщений: они дорогие по токенам.
+    const userIds = rows.filter((r) => r.role === 'user').map((r) => r.id);
+    const meta = await app.conversations.attachmentMeta(userIds);
+    const withImages = userIds.filter((id) => meta.has(id)).slice(-MAX_IMAGE_MESSAGES);
+    const images = await app.conversations.attachmentImages(withImages);
+    const messages = buildMessages(opts.system, rows, app.config.agent.contextTokens, { images, meta });
 
     let resp;
     try {

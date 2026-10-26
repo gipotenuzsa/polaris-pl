@@ -648,3 +648,83 @@ describe('стриминг и остановка ответа', () => {
     expect(again.json()).toEqual({ stopped: false });
   });
 });
+
+describe('вложения-изображения', () => {
+  // 1×1 PNG
+  const PNG =
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+
+  const setup = async () => {
+    env = await createTestEnv({ script: () => ({ content: 'вижу картинку' }) });
+    const h = await login(env.app);
+    const { conversation } = (
+      await env.app.inject({ method: 'POST', url: '/api/conversations', headers: h, payload: {} })
+    ).json();
+    return { h, id: conversation.id as string };
+  };
+  const upload = (h: Record<string, string>, payload: Record<string, unknown>) =>
+    env.app.inject({ method: 'POST', url: '/api/attachments', headers: h, payload });
+
+  it('загруженная картинка уходит модели как изображение и видна в диалоге', async () => {
+    const { h, id } = await setup();
+    const up = await upload(h, { name: 'cat.png', mime: 'image/png', data: PNG });
+    expect(up.statusCode).toBe(200);
+    const att = up.json().attachment as { id: string; name: string; mime: string };
+
+    const sent = await env.app.inject({
+      method: 'POST',
+      url: `/api/conversations/${id}/messages`,
+      headers: h,
+      payload: { content: 'что тут?', attachmentIds: [att.id] },
+    });
+    expect(sent.statusCode).toBe(202);
+    expect(sent.json().message.attachments).toEqual([att]);
+    await env.ctx.runs.idle();
+
+    const userMsg = env.provider.calls[0]!.messages.find((m) => m.role === 'user')!;
+    expect(userMsg).toMatchObject({ content: 'что тут?', images: [{ mime: 'image/png', data: PNG }] });
+
+    const conv = (await env.app.inject({ url: `/api/conversations/${id}`, headers: h })).json();
+    expect(conv.messages[0].attachments).toEqual([att]);
+    const file = await env.app.inject({ url: `/api/attachments/${att.id}`, headers: h });
+    expect(file.headers['content-type']).toBe('image/png');
+    expect(file.rawPayload.equals(Buffer.from(PNG, 'base64'))).toBe(true);
+  });
+
+  it('можно отправить только картинку, без текста; чужие вложения не перехватываются', async () => {
+    const { h, id } = await setup();
+    const att = (await upload(h, { name: 'a.png', mime: 'image/png', data: PNG })).json().attachment;
+    const first = await env.app.inject({
+      method: 'POST',
+      url: `/api/conversations/${id}/messages`,
+      headers: h,
+      payload: { attachmentIds: [att.id] },
+    });
+    expect(first.statusCode).toBe(202);
+    await env.ctx.runs.idle();
+    const other = (await env.app.inject({ method: 'POST', url: '/api/conversations', headers: h, payload: {} })).json();
+    await env.app.inject({
+      method: 'POST',
+      url: `/api/conversations/${other.conversation.id}/messages`,
+      headers: h,
+      payload: { content: 'привет', attachmentIds: [att.id] },
+    });
+    await env.ctx.runs.idle();
+    const second = (await env.app.inject({ url: `/api/conversations/${other.conversation.id}`, headers: h })).json();
+    expect(second.messages[0].attachments).toBeUndefined();
+  });
+
+  it('отклоняет не-изображения, не-base64 и пустые сообщения; без входа доступа нет', async () => {
+    const { h, id } = await setup();
+    expect((await upload(h, { name: 'x.exe', mime: 'application/zip', data: PNG })).statusCode).toBe(400);
+    expect((await upload(h, { name: 'x.png', mime: 'image/png', data: '<script>alert(1)</script>' })).statusCode).toBe(400);
+    const empty = await env.app.inject({
+      method: 'POST',
+      url: `/api/conversations/${id}/messages`,
+      headers: h,
+      payload: { content: '  ' },
+    });
+    expect(empty.statusCode).toBe(400);
+    expect((await env.app.inject({ method: 'POST', url: '/api/attachments', payload: {} })).statusCode).toBe(401);
+  });
+});

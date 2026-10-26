@@ -13,7 +13,17 @@ export function toResponsesInput(messages: ChatMessage[]): { instructions: strin
         system.push(m.content);
         break;
       case 'user':
-        input.push({ type: 'message', role: 'user', content: [{ type: 'input_text', text: m.content }] });
+        input.push({
+          type: 'message',
+          role: 'user',
+          content: [
+            { type: 'input_text', text: m.content || 'Изображение во вложении.' },
+            ...(m.images ?? []).map((img) => ({
+              type: 'input_image',
+              image_url: `data:${img.mime};base64,${img.data}`,
+            })),
+          ],
+        });
         break;
       case 'assistant':
         if (m.content) {

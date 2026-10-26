@@ -4,6 +4,7 @@ import type {
   ActionEntry,
   Approval,
   AppNotification,
+  Attachment,
   BudgetLimits,
   BudgetSummary,
   ChatGptStatus,
@@ -96,6 +97,12 @@ function authInit(init: RequestInit = {}): RequestInit {
   const headers: Record<string, string> = { ...(init.headers as Record<string, string> | undefined) };
   if (token && !usesCookies()) headers.authorization = `Bearer ${token}`;
   return { ...init, headers, credentials: usesCookies() ? 'same-origin' : 'omit' };
+}
+
+/** Адрес картинки-вложения и заголовки авторизации (в вебе с cookie заголовки не нужны). */
+export function attachmentSource(id: string): { uri: string; headers?: Record<string, string> } {
+  const uri = `${baseUrl}/api/attachments/${id}`;
+  return token && !usesCookies() ? { uri, headers: { authorization: `Bearer ${token}` } } : { uri };
 }
 
 export async function login(serverUrl: string, password: string): Promise<void> {
@@ -194,8 +201,10 @@ export const api = {
   renameConversation: (id: string, title: string) => patch<{ ok: true }>(`/api/conversations/${id}`, { title }),
   deleteConversation: (id: string) => del<{ ok: true }>(`/api/conversations/${id}`),
   stopConversation: (id: string) => post<{ stopped: boolean }>(`/api/conversations/${id}/stop`),
-  sendMessage: (id: string, content: string) =>
-    post<{ message: Message; running: boolean }>(`/api/conversations/${id}/messages`, { content }),
+  sendMessage: (id: string, content: string, attachmentIds: string[] = []) =>
+    post<{ message: Message; running: boolean }>(`/api/conversations/${id}/messages`, { content, attachmentIds }),
+  uploadAttachment: (a: { name: string; mime: string; data: string }) =>
+    post<{ attachment: Attachment }>('/api/attachments', a),
 
   memory: () => get<{ items: MemoryItem[] }>('/api/memory'),
   addMemory: (kind: MemoryItem['kind'], content: string) =>

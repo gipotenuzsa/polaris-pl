@@ -14,9 +14,15 @@ export interface ToolCall {
   meta?: Record<string, unknown>;
 }
 
+/** Изображение, прикреплённое к реплике пользователя (base64 без префикса data:). */
+export interface ImagePart {
+  mime: string;
+  data: string;
+}
+
 export type ChatMessage =
   | { role: 'system'; content: string }
-  | { role: 'user'; content: string }
+  | { role: 'user'; content: string; images?: ImagePart[] }
   | { role: 'assistant'; content: string; toolCalls?: ToolCall[] }
   | { role: 'tool'; toolCallId: string; name: string; content: string };
 

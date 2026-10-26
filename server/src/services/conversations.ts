@@ -1,6 +1,6 @@
 import type { AppContext } from '../context.js';
 import { json, queryOne } from '../db/types.js';
-import type { ChatMessage, ToolCall } from '../providers/types.js';
+import type { ChatMessage, ImagePart, ToolCall } from '../providers/types.js';
 import { notFound } from '../util/errors.js';
 
 export type ConversationKind = 'chat' | 'task' | 'summary';
@@ -39,6 +39,14 @@ export interface ConversationDto {
   updatedAt: string;
 }
 
+export interface AttachmentMeta {
+  id: string;
+  name: string;
+  mime: string;
+}
+
+export const IMAGE_MIMES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'] as const;
+
 export interface MessageDto {
   id: string;
   seq: number;
@@ -52,6 +60,7 @@ export interface MessageDto {
   approvalId?: string;
   provider?: string;
   model?: string;
+  attachments?: AttachmentMeta[];
   createdAt: string;
 }
 
@@ -65,7 +74,7 @@ export const toConversationDto = (r: ConversationRow): ConversationDto => ({
   updatedAt: iso(r.updated_at),
 });
 
-export const toMessageDto = (r: MessageRow): MessageDto => ({
+export const toMessageDto = (r: MessageRow, attachments?: AttachmentMeta[]): MessageDto => ({
   id: r.id,
   seq: r.seq,
   conversationId: r.conversation_id,
@@ -78,15 +87,24 @@ export const toMessageDto = (r: MessageRow): MessageDto => ({
   approvalId: r.approval_id ?? undefined,
   provider: r.provider ?? undefined,
   model: r.model ?? undefined,
+  attachments: attachments?.length ? attachments : undefined,
   createdAt: iso(r.created_at),
 });
 
 /** Строки БД → сообщения для модели. Незавершённые (pending) вызовы сюда попадать не должны. */
-export function rowsToChat(rows: MessageRow[]): ChatMessage[] {
+export function rowsToChat(
+  rows: MessageRow[],
+  att: { images?: Map<string, ImagePart[]>; meta?: Map<string, AttachmentMeta[]> } = {},
+): ChatMessage[] {
   const out: ChatMessage[] = [];
   for (const r of rows) {
-    if (r.role === 'user') out.push({ role: 'user', content: r.content });
-    else if (r.role === 'system') out.push({ role: 'system', content: r.content });
+    if (r.role === 'user') {
+      const images = att.images?.get(r.id);
+      // Старые вложения в контекст не отправляем (дорого) — модель видит только пометку о них.
+      const skipped = images ? [] : (att.meta?.get(r.id) ?? []);
+      const note = skipped.length ? `\n[Прикреплено изображение: ${skipped.map((a) => a.name).join(', ')}]` : '';
+      out.push({ role: 'user', content: r.content + note, ...(images?.length ? { images } : {}) });
+    } else if (r.role === 'system') out.push({ role: 'system', content: r.content });
     else if (r.role === 'assistant') {
       out.push({ role: 'assistant', content: r.content, ...(r.tool_calls?.length ? { toolCalls: r.tool_calls } : {}) });
     } else {
@@ -175,6 +193,63 @@ export class ConversationService {
     );
     await this.ctx.db.query('update conversations set updated_at = now() where id = $1', [m.conversationId]);
     return rows[0]!;
+  }
+
+  // ── Вложения ───────────────────────────────────────────────────────────────
+
+  async createAttachment(a: { name: string; mime: string; data: string }): Promise<AttachmentMeta> {
+    const rows = await this.ctx.db.query<AttachmentMeta>(
+      'insert into attachments (name, mime, data_b64) values ($1, $2, $3) returning id, name, mime',
+      [a.name.slice(0, 200), a.mime, a.data],
+    );
+    return rows[0]!;
+  }
+
+  async getAttachment(id: string): Promise<{ mime: string; data: string } | undefined> {
+    return queryOne<{ mime: string; data: string }>(
+      this.ctx.db,
+      'select mime, data_b64 as data from attachments where id = $1',
+      [id],
+    );
+  }
+
+  /** Привязывает загруженные вложения к сообщению (только свободные — чужие не перехватить). */
+  async attach(ids: string[], messageId: string): Promise<void> {
+    if (!ids.length) return;
+    await this.ctx.db.query(
+      'update attachments set message_id = $2 where id = any($1::uuid[]) and message_id is null',
+      [ids, messageId],
+    );
+  }
+
+  async attachmentMeta(messageIds: string[]): Promise<Map<string, AttachmentMeta[]>> {
+    const out = new Map<string, AttachmentMeta[]>();
+    if (!messageIds.length) return out;
+    const rows = await this.ctx.db.query<AttachmentMeta & { message_id: string }>(
+      'select id, name, mime, message_id from attachments where message_id = any($1::uuid[]) order by created_at',
+      [messageIds],
+    );
+    for (const r of rows) {
+      out.set(r.message_id, [...(out.get(r.message_id) ?? []), { id: r.id, name: r.name, mime: r.mime }]);
+    }
+    return out;
+  }
+
+  async attachmentImages(messageIds: string[]): Promise<Map<string, ImagePart[]>> {
+    const out = new Map<string, ImagePart[]>();
+    if (!messageIds.length) return out;
+    const rows = await this.ctx.db.query<{ message_id: string; mime: string; data: string }>(
+      'select message_id, mime, data_b64 as data from attachments where message_id = any($1::uuid[]) order by created_at',
+      [messageIds],
+    );
+    for (const r of rows) out.set(r.message_id, [...(out.get(r.message_id) ?? []), { mime: r.mime, data: r.data }]);
+    return out;
+  }
+
+  /** Сообщения → DTO для клиента (с метаданными вложений). */
+  async toDtos(rows: MessageRow[]): Promise<MessageDto[]> {
+    const meta = await this.attachmentMeta(rows.filter((r) => r.role === 'user').map((r) => r.id));
+    return rows.map((r) => toMessageDto(r, meta.get(r.id)));
   }
 
   /** Завершает ожидавший подтверждения вызов инструмента: подставляет результат на его место. */
