@@ -201,7 +201,7 @@ function ChatGptCard({ status, onChange }: { status: ChatGptStatus; onChange: ()
         </View>
       ) : null}
 
-      <SectionTitle>Провайдер</SectionTitle>
+      <SectionTitle>Модель</SectionTitle>
       <Row style={{ flexWrap: 'wrap' }}>
         {status.models.map((m) => (
           <Chip

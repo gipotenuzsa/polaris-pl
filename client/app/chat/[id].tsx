@@ -275,8 +275,9 @@ export default function ChatScreen() {
           ref={list}
           data={messages}
           keyExtractor={(m) => m.id}
-          style={WIDE}
+          style={{ width: '100%' }}
           contentContainerStyle={{
+            ...WIDE,
             paddingHorizontal: space.lg,
             paddingTop: space.md,
             paddingBottom: space.lg,

@@ -42,7 +42,11 @@ if (!html.includes('rel="manifest"')) {
         '<meta name="apple-mobile-web-app-title" content="Polaris">',
         '<meta name="apple-mobile-web-app-status-bar-style" content="default">',
         '<meta name="color-scheme" content="light">',
-        '<style>html,body{background:#F5F0E6}</style>',
+        '<style>html,body{background:#F5F0E6}',
+        '*{scrollbar-width:thin;scrollbar-color:#D6CBB6 transparent}',
+        '::-webkit-scrollbar{width:8px;height:8px}::-webkit-scrollbar-track{background:transparent}',
+        '::-webkit-scrollbar-thumb{background:#D6CBB6;border-radius:8px;border:2px solid transparent;background-clip:content-box}',
+        '::-webkit-scrollbar-thumb:hover{background:#BFB197;background-clip:content-box;border:2px solid transparent}</style>',
         '</head>',
       ].join('\n'),
     );
