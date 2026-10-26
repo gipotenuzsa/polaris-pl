@@ -37,6 +37,13 @@ const SUGGESTIONS = [
 
 const WIDE = { width: '100%', maxWidth: 760, alignSelf: 'center' } as const;
 
+/** Служебные обёртки недоверенного содержимого (<web_content …>) пользователю ни к чему. */
+const clean = (s: string) =>
+  s
+    .replace(/<\/?web_content[^>]*>/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+
 function ToolRow({ m, approval, onResolved }: { m: Message; approval?: Approval; onResolved: () => void }) {
   const [open, setOpen] = useState(false);
   if (m.status === 'pending' && approval) return <ApprovalCard approval={approval} onResolved={onResolved} />;
@@ -61,7 +68,7 @@ function ToolRow({ m, approval, onResolved }: { m: Message; approval?: Approval;
           numberOfLines={open ? undefined : 1}
         >
           {toolLabel(m.toolName ?? 'инструмент')}
-          {m.content ? ` · ${open ? m.content : shorten(m.content, 80)}` : ''}
+          {m.content ? ` · ${open ? clean(m.content) : shorten(clean(m.content), 80)}` : ''}
         </Text>
       </Pressable>
     </FadeIn>
