@@ -121,7 +121,7 @@ export default function TaskDetail() {
             </Card>
 
             {task.status === 'awaiting_approval' ? (
-              <Card style={{ borderColor: '#ff9f6b' }}>
+              <Card style={{ borderColor: colors.attention }}>
                 <Body>Задача остановилась и ждёт вашего решения.</Body>
                 <Button
                   title="Открыть подтверждения"

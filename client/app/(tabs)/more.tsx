@@ -44,7 +44,7 @@ function Item({
       {badge ? (
         <View
           style={{
-            backgroundColor: colors.danger,
+            backgroundColor: colors.accent,
             borderRadius: 10,
             minWidth: 20,
             paddingHorizontal: 6,
@@ -52,7 +52,7 @@ function Item({
             marginRight: 8,
           }}
         >
-          <Text style={{ color: '#fff', fontSize: 12, fontWeight: '700' }}>{badge}</Text>
+          <Text style={{ color: colors.accentText, fontSize: 12, fontWeight: '700' }}>{badge}</Text>
         </View>
       ) : null}
       <Ionicons name="chevron-forward" size={18} color={colors.muted} />

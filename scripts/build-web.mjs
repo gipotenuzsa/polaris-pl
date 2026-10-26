@@ -40,9 +40,9 @@ if (!html.includes('rel="manifest"')) {
         '<meta name="apple-mobile-web-app-capable" content="yes">',
         '<meta name="mobile-web-app-capable" content="yes">',
         '<meta name="apple-mobile-web-app-title" content="Polaris">',
-        '<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">',
-        '<meta name="color-scheme" content="dark">',
-        '<style>html,body{background:#0a1020}</style>',
+        '<meta name="apple-mobile-web-app-status-bar-style" content="default">',
+        '<meta name="color-scheme" content="light">',
+        '<style>html,body{background:#F5F0E6}</style>',
         '</head>',
       ].join('\n'),
     );

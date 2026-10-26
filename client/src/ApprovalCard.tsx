@@ -34,7 +34,7 @@ export function ApprovalCard({ approval, onResolved }: { approval: Approval; onR
   };
 
   return (
-    <Card style={{ borderColor: pending ? '#ff9f6b' : colors.border }}>
+    <Card style={{ borderColor: pending ? colors.attention : colors.border }}>
       <Row style={{ justifyContent: 'space-between', marginBottom: space.sm }}>
         <Text style={{ color: colors.text, fontWeight: '700', fontSize: 15, flex: 1 }}>
           {toolLabel(approval.action)}

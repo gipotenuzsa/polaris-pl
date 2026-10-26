@@ -271,7 +271,7 @@ describe('ChatGptAuth и провайдер', () => {
     }
   });
 
-  it('после входа ChatGPT включается сам, если других провайдеров нет; при наличии других остаётся выключенным', async () => {
+  it('после входа ChatGPT включается сам независимо от других провайдеров', async () => {
     const { ScriptedProvider } = await import('./helpers.js');
     const mkEnv = async (otherAvailable: boolean) => {
       const fetchMock = vi.fn(async (input: string | URL | Request) => {
@@ -296,7 +296,7 @@ describe('ChatGptAuth и провайдер', () => {
 
     expect(await mkEnv(false)).toMatchObject({ connected: true, enabled: true });
     await env.close();
-    expect(await mkEnv(true)).toMatchObject({ connected: true, enabled: false });
+    expect(await mkEnv(true)).toMatchObject({ connected: true, enabled: true });
   });
 
   it('истекающий токен обновляется одним запросом даже при параллельных вызовах', async () => {

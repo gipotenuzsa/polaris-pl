@@ -28,20 +28,7 @@ let quitting = false;
 const ENV_TEMPLATE = `# Настройки Polaris для Windows. Строки вида КЛЮЧ=значение; «#» — комментарий.
 # После изменений: меню «Сервер → Перезапустить сервер».
 #
-# Хотя бы один провайдер моделей нужен, чтобы агент отвечал.
-# Ключи хранятся только в этом файле на вашем компьютере.
-
-# OpenRouter (https://openrouter.ai/keys) — первый в цепочке
-OPENROUTER_API_KEY=
-OPENROUTER_MODEL=openrouter/auto
-
-# Google Gemini (https://aistudio.google.com/apikey)
-GEMINI_API_KEY=
-GEMINI_MODEL=gemini-2.5-flash
-
-# Ollama — локальные модели (например, http://localhost:11434)
-OLLAMA_BASE_URL=
-OLLAMA_MODEL=
+# Модели: только ChatGPT по OAuth. Войдите в приложении: Ещё → Настройки → ChatGPT.
 
 # Поиск в интернете: ключ Brave Search API (https://brave.com/search/api/)
 BRAVE_API_KEY=
@@ -149,12 +136,12 @@ async function freePort(preferred) {
 const page = (title, body) =>
   'data:text/html;charset=utf-8,' +
   encodeURIComponent(`<!doctype html><meta charset="utf-8"><title>${title}</title>
-  <body style="margin:0;display:flex;align-items:center;justify-content:center;height:100vh;background:#0a1020;color:#e9eefb;font:15px 'Segoe UI',sans-serif">
+  <body style="margin:0;display:flex;align-items:center;justify-content:center;height:100vh;background:#F5F0E6;color:#2B2620;font:15px 'Segoe UI',sans-serif">
   <div style="max-width:560px;padding:24px;text-align:center">${body}</div>`);
 
 const loadingPage = page(
   'Polaris',
-  '<div style="font-size:38px;color:#6ea8ff">✦</div><h2>Polaris запускается…</h2><p style="color:#8f9cbf">Поднимаю локальный сервер</p>',
+  '<div style="font-size:38px;color:#B8613A">✦</div><h2>Polaris запускается…</h2><p style="color:#8C8272">Поднимаю локальный сервер</p>',
 );
 
 async function startLocal() {
@@ -214,9 +201,9 @@ async function openLocal() {
     await win?.loadURL(
       page(
         'Ошибка',
-        `<h2 style="color:#ff6b7a">Не удалось запустить Polaris</h2><p>${message}</p>
-         <p style="color:#8f9cbf">Журнал: ${logFile.replace(/\\/g, '\\\\')}<br>Настройки: ${envFile.replace(/\\/g, '\\\\')}</p>
-         <p style="color:#8f9cbf">Исправьте настройки и выберите «Сервер → Перезапустить сервер».</p>`,
+        `<h2 style="color:#B5483A">Не удалось запустить Polaris</h2><p>${message}</p>
+         <p style="color:#8C8272">Журнал: ${logFile.replace(/\\/g, '\\\\')}<br>Настройки: ${envFile.replace(/\\/g, '\\\\')}</p>
+         <p style="color:#8C8272">Исправьте настройки и выберите «Сервер → Перезапустить сервер».</p>`,
       ),
     );
   }
@@ -245,7 +232,7 @@ function askRemoteUrl(current) {
       resizable: false,
       minimizable: false,
       maximizable: false,
-      backgroundColor: '#0a1020',
+      backgroundColor: '#F5F0E6',
       webPreferences: {
         preload: path.join(here, 'prompt-preload.cjs'),
         contextIsolation: true,
@@ -378,7 +365,7 @@ function createWindow() {
     height: 820,
     minWidth: 420,
     minHeight: 560,
-    backgroundColor: '#0a1020',
+    backgroundColor: '#F5F0E6',
     title: 'Polaris',
     icon: fs.existsSync(iconPath) ? nativeImage.createFromPath(iconPath) : undefined,
     webPreferences: { contextIsolation: true, nodeIntegration: false, sandbox: true },

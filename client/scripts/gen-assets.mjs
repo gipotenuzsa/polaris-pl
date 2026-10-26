@@ -69,18 +69,18 @@ function icon({ background, radius, transparent }) {
     if (background) {
       const d = Math.hypot(u - 0.5, v - 0.42);
       const t = clamp01(d / 0.75);
-      bg = [mix(24, 6, t), mix(40, 10, t), mix(86, 24, t), 255];
+      bg = [mix(250, 232, t), mix(245, 222, t), mix(236, 203, t), 255];
     }
-    const glowA = clamp01(glow);
+    const glowA = clamp01(glow) * 0.45;
     const base = background ? bg : [0, 0, 0, 0];
-    const gcol = [110, 168, 255];
+    const gcol = [184, 97, 58];
     let out = [
       mix(base[0], gcol[0], glowA),
       mix(base[1], gcol[1], glowA),
       mix(base[2], gcol[2], glowA),
       transparent ? Math.max(base[3], glowA * 255) : 255,
     ];
-    const white = [255, 255, 255];
+    const white = [43, 38, 32];
     const k = clamp01(cover + core * 0.6);
     out = [mix(out[0], white[0], k), mix(out[1], white[1], k), mix(out[2], white[2], k), Math.max(out[3], k * 255)];
     return out.map((c) => Math.round(c));

@@ -31,13 +31,14 @@ export default function RootLayout() {
     <SafeAreaProvider>
       <AuthProvider>
         <StatusProvider>
-          <StatusBar style="light" />
+          <StatusBar style="dark" />
           <Gate>
             <Stack
               screenOptions={{
                 headerStyle: { backgroundColor: colors.bg },
                 headerTintColor: colors.text,
-                headerTitleStyle: { fontWeight: '700' },
+                headerTitleStyle: { fontWeight: '600', fontSize: 18 },
+                animation: 'slide_from_right',
                 headerShadowVisible: false,
                 contentStyle: { backgroundColor: colors.bg },
                 headerBackTitle: 'Назад',

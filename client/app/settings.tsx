@@ -63,12 +63,11 @@ function ChatGptCard({ status, onChange }: { status: ChatGptStatus; onChange: ()
           color={status.connected ? colors.success : colors.muted}
         />
       </Row>
-      <View style={{ backgroundColor: '#2a2210', borderRadius: 8, padding: space.md, marginBottom: space.md }}>
+      <View style={{ backgroundColor: colors.warnBg, borderRadius: 8, padding: space.md, marginBottom: space.md }}>
         <Text style={{ color: colors.warn, fontSize: 13, lineHeight: 19 }}>
           Только для личного использования на своей подписке ChatGPT Plus/Pro. Это неофициальный способ доступа: условия
-          OpenAI могут его ограничивать, а интерфейс — меняться без предупреждения. Одна подписка на инстанс. Провайдер
-          всегда стоит последним в цепочке: он отвечает, когда остальные провайдеры не ответили, а если других ключей
-          нет — работает единственным.
+          OpenAI могут его ограничивать, а интерфейс — меняться без предупреждения. Одна подписка на инстанс.
+          ChatGPT — единственный провайдер моделей в Polaris.
         </Text>
       </View>
 
@@ -202,7 +201,7 @@ function ChatGptCard({ status, onChange }: { status: ChatGptStatus; onChange: ()
         </View>
       ) : null}
 
-      <SectionTitle>Модель</SectionTitle>
+      <SectionTitle>Провайдер</SectionTitle>
       <Row style={{ flexWrap: 'wrap' }}>
         {status.models.map((m) => (
           <Chip
@@ -291,8 +290,7 @@ function BudgetForm({ data, onSaved }: { data: BudgetSummary; onSaved: () => Pro
       {field('runTokens', 'На одну команду/задачу, токенов')}
       {field('runUsd', 'На одну команду/задачу, $')}
       <Muted style={{ marginBottom: space.md }}>
-        0 — без лимита. При превышении агент жёстко останавливается. Стоимость считается по ценам OpenRouter и таблице
-        PRICES_JSON; для подписки ChatGPT учитываются только токены.
+        0 — без лимита. При превышении агент жёстко останавливается. Для подписки ChatGPT учитываются только токены.
       </Muted>
       <Button title="Сохранить лимиты" onPress={save} loading={saving} />
     </>
@@ -541,34 +539,7 @@ export default function Settings() {
             </>
           ) : null}
 
-          <SectionTitle>Провайдеры моделей (по порядку)</SectionTitle>
-          {data?.providers.map((p, i) => (
-            <Card key={p.id}>
-              <Row style={{ justifyContent: 'space-between' }}>
-                <Text style={{ color: colors.text, fontWeight: '600' }}>
-                  {i + 1}. {p.label}
-                </Text>
-                <Badge
-                  label={
-                    p.cooldownUntil
-                      ? 'Пауза после сбоя'
-                      : p.available
-                        ? 'Готов'
-                        : p.id === 'chatgpt'
-                          ? 'Выключен'
-                          : 'Не настроен'
-                  }
-                  color={p.cooldownUntil ? colors.warn : p.available ? colors.success : colors.muted}
-                />
-              </Row>
-              <Muted style={{ marginTop: 4 }}>Модель: {p.model || '—'}</Muted>
-            </Card>
-          ))}
-          <Muted>
-            Ключи задаются переменными окружения на сервере. При 429, таймауте или ошибке запрос уходит к следующему
-            провайдеру.
-          </Muted>
-
+          <SectionTitle>Провайдер</SectionTitle>
           {data ? <ChatGptCard status={data.chatgpt} onChange={refresh} /> : null}
 
           <SectionTitle>Бюджет</SectionTitle>

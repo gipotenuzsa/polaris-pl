@@ -22,7 +22,7 @@ export class AllProvidersFailedError extends Error {
     super(
       attempts.length
         ? `Ни один провайдер не ответил: ${attempts.map((a) => `${a.provider} — ${a.error}`).join('; ')}`
-        : 'Нет доступных провайдеров моделей. Задайте OPENROUTER_API_KEY, GEMINI_API_KEY или OLLAMA_BASE_URL, либо подключите ChatGPT в настройках.',
+        : 'Нет доступных провайдеров моделей. Подключите ChatGPT: Ещё → Настройки → ChatGPT (OAuth).',
     );
     this.name = 'AllProvidersFailedError';
   }

@@ -17,13 +17,15 @@ export default function TabsLayout() {
       screenOptions={{
         headerStyle: { backgroundColor: colors.bg },
         headerTintColor: colors.text,
-        headerTitleStyle: { fontWeight: '700' },
+        headerTitleStyle: { fontWeight: '600', fontSize: 18 },
         headerShadowVisible: false,
         sceneStyle: { backgroundColor: colors.bg },
-        tabBarStyle: { backgroundColor: colors.surface, borderTopColor: colors.border },
+        tabBarStyle: { backgroundColor: colors.bg, borderTopColor: colors.border, elevation: 0 },
+        tabBarLabelStyle: { fontSize: 11, fontWeight: '500' },
         tabBarActiveTintColor: colors.accent,
         tabBarInactiveTintColor: colors.muted,
-        tabBarBadgeStyle: { backgroundColor: colors.danger, color: '#fff' },
+        tabBarBadgeStyle: { backgroundColor: colors.accent, color: colors.accentText },
+        animation: 'fade',
       }}
     >
       <Tabs.Screen name="index" options={{ title: 'Чаты', tabBarIcon: icon('chatbubbles-outline', 'chatbubbles') }} />

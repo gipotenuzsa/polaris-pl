@@ -1,25 +1,42 @@
+// Тёплая бежевая палитра: бумага, чернила, один терракотовый акцент.
 export const colors = {
-  bg: '#0a1020',
-  surface: '#121a30',
-  surface2: '#1a2442',
-  border: '#27335a',
-  text: '#e9eefb',
-  muted: '#8f9cbf',
-  accent: '#6ea8ff',
-  accentText: '#04122b',
-  success: '#4ad2a1',
-  warn: '#f4c15d',
-  danger: '#ff6b7a',
-  userBubble: '#1f3d73',
+  bg: '#F5F0E6',
+  surface: '#FCFAF5',
+  surface2: '#EEE7D9',
+  border: '#E3DACA',
+  text: '#2B2620',
+  muted: '#8C8272',
+  /** терракота: активные элементы, ссылки, индикаторы */
+  accent: '#B8613A',
+  /** «чернила»: основные кнопки и выбранные чипы */
+  ink: '#2B2620',
+  /** текст на чернильном фоне */
+  accentText: '#FBF7EE',
+  success: '#5E8C61',
+  warn: '#B7791F',
+  warnBg: '#F6EBCF',
+  attention: '#C2693F',
+  danger: '#B5483A',
+  dangerBg: '#F6E1DB',
+  userBubble: '#E9DFCB',
 };
 
 export const space = { xs: 4, sm: 8, md: 12, lg: 16, xl: 24 };
-export const radius = { sm: 8, md: 12, lg: 18 };
+export const radius = { sm: 10, md: 14, lg: 22 };
+
+/** Мягкая тень — единственная «глубина» в интерфейсе. */
+export const shadow = {
+  shadowColor: '#5B4A2E',
+  shadowOpacity: 0.1,
+  shadowRadius: 18,
+  shadowOffset: { width: 0, height: 6 },
+  elevation: 3,
+} as const;
 
 export const TASK_STATUS: Record<string, { label: string; color: string }> = {
   scheduled: { label: 'Запланирована', color: colors.accent },
   in_progress: { label: 'В процессе', color: colors.warn },
-  awaiting_approval: { label: 'Ждёт подтверждения', color: '#ff9f6b' },
+  awaiting_approval: { label: 'Ждёт подтверждения', color: colors.attention },
   done: { label: 'Готово', color: colors.success },
   failed: { label: 'Ошибка', color: colors.danger },
   cancelled: { label: 'Отменена', color: colors.muted },

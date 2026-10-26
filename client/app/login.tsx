@@ -1,4 +1,4 @@
-import { Ionicons } from '@expo/vector-icons';
+import { FadeIn } from '../src/motion';
 import { useState } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -35,11 +35,13 @@ export default function Login() {
           keyboardShouldPersistTaps="handled"
         >
           <View style={{ width: '100%', maxWidth: 420, alignSelf: 'center' }}>
-            <View style={{ alignItems: 'center', marginBottom: space.xl }}>
-              <Ionicons name="sparkles" size={56} color={colors.accent} />
-              <Text style={{ color: colors.text, fontSize: 32, fontWeight: '800', marginTop: space.md }}>Polaris</Text>
-              <Muted>Личный фоновый AI-агент</Muted>
-            </View>
+            <FadeIn style={{ alignItems: 'center', marginBottom: space.xl * 1.5 }} distance={14} duration={500}>
+              <Text style={{ color: colors.accent, fontSize: 44 }}>✦</Text>
+              <Text style={{ color: colors.text, fontSize: 34, fontWeight: '600', letterSpacing: -1, marginTop: space.sm }}>
+                Polaris
+              </Text>
+              <Muted style={{ marginTop: 4 }}>Личный фоновый AI-агент</Muted>
+            </FadeIn>
             <ErrorNote message={error} />
             {askUrl ? (
               <Input

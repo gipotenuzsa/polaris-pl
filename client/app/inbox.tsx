@@ -13,7 +13,7 @@ const ICON: Record<AppNotification['kind'], { name: React.ComponentProps<typeof 
   reminder: { name: 'alarm-outline', color: colors.warn },
   task_done: { name: 'checkmark-circle-outline', color: colors.success },
   task_failed: { name: 'alert-circle-outline', color: colors.danger },
-  approval: { name: 'shield-checkmark-outline', color: '#ff9f6b' },
+  approval: { name: 'shield-checkmark-outline', color: colors.attention },
   morning: { name: 'sunny-outline', color: colors.warn },
   info: { name: 'information-circle-outline', color: colors.accent },
 };

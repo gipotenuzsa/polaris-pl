@@ -7,8 +7,6 @@ import type { Db } from './db/types.js';
 import { ProviderChain } from './providers/chain.js';
 import { ChatGptAuth } from './providers/chatgpt/auth.js';
 import { ChatGptProvider } from './providers/chatgpt/provider.js';
-import { GeminiProvider } from './providers/gemini.js';
-import { OpenAICompatProvider } from './providers/openaiCompat.js';
 import type { ModelProvider } from './providers/types.js';
 import { ActionsService } from './services/actions.js';
 import { ApprovalsService } from './services/approvals.js';
@@ -51,42 +49,9 @@ export interface BootstrapOptions {
   extraTools?: AnyTool[];
 }
 
+/** Единственный провайдер моделей — ChatGPT по OAuth (подписка владельца инстанса). */
 function buildProviders(ctx: AppContext): ModelProvider[] {
-  const { providers: cfg } = ctx.config;
-  const byId: Record<string, () => ModelProvider> = {
-    openrouter: () =>
-      new OpenAICompatProvider({
-        id: 'openrouter',
-        label: 'OpenRouter',
-        baseUrl: cfg.openrouter.baseUrl,
-        apiKey: cfg.openrouter.apiKey,
-        model: cfg.openrouter.model,
-        requireKey: true,
-        includeCost: true,
-        extraHeaders: { 'http-referer': ctx.config.publicUrl ?? 'https://github.com/polaris-pl', 'x-title': 'Polaris' },
-        fetch: ctx.fetch,
-      }),
-    gemini: () => new GeminiProvider({ apiKey: cfg.gemini.apiKey ?? '', model: cfg.gemini.model, fetch: ctx.fetch }),
-    ollama: () => {
-      const base = (cfg.ollama.baseUrl ?? '').replace(/\/+$/, '');
-      return new OpenAICompatProvider({
-        id: 'ollama',
-        label: 'Ollama',
-        baseUrl: base ? (base.endsWith('/v1') ? base : `${base}/v1`) : '',
-        model: cfg.ollama.model ?? '',
-        fetch: ctx.fetch,
-      });
-    },
-  };
-  const out: ModelProvider[] = [];
-  const seen = new Set<string>();
-  for (const id of [...cfg.order, 'openrouter', 'gemini', 'ollama']) {
-    if (seen.has(id) || !byId[id]) continue;
-    seen.add(id);
-    out.push(byId[id]());
-  }
-  out.push(new ChatGptProvider(ctx)); // ChatGPT OAuth всегда последний
-  return out;
+  return [new ChatGptProvider(ctx)];
 }
 
 function buildFiles(config: Config): FileStore {

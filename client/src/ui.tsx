@@ -1,10 +1,9 @@
 import { Ionicons } from '@expo/vector-icons';
-import type { ComponentProps, ReactNode } from 'react';
+import { useState, type ComponentProps, type ReactNode } from 'react';
 import {
   ActivityIndicator,
   Alert,
   Platform,
-  Pressable,
   StyleSheet,
   Switch,
   Text,
@@ -16,6 +15,7 @@ import {
   type ViewStyle,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { PressScale, TypingDots, FadeIn } from './motion';
 import { colors, radius, space } from './theme';
 
 export type IconName = ComponentProps<typeof Ionicons>['name'];
@@ -39,12 +39,12 @@ export function Card({
 }) {
   if (onPress) {
     return (
-      <Pressable onPress={onPress} style={({ pressed }) => [s.card, pressed && { opacity: 0.8 }, style]}>
+      <PressScale onPress={onPress} scale={0.985} style={[s.card, style]}>
         {children}
-      </Pressable>
+      </PressScale>
     );
   }
-  return <View style={[s.card, style]}>{children}</View>;
+  return <FadeIn distance={6} style={[s.card, style]}>{children}</FadeIn>;
 }
 
 export function Button({
@@ -64,7 +64,7 @@ export function Button({
   icon?: IconName;
   style?: StyleProp<ViewStyle>;
 }) {
-  const bg = { primary: colors.accent, secondary: colors.surface2, danger: colors.danger, ghost: 'transparent' }[
+  const bg = { primary: colors.ink, secondary: colors.surface, danger: colors.danger, ghost: 'transparent' }[
     variant
   ];
   const fg =
@@ -75,12 +75,12 @@ export function Button({
         : colors.text;
   const off = disabled || loading;
   return (
-    <Pressable
+    <PressScale
       accessibilityRole="button"
       onPress={off ? undefined : onPress}
-      style={({ pressed }) => [
+      style={[
         s.button,
-        { backgroundColor: bg, opacity: off ? 0.5 : pressed ? 0.8 : 1 },
+        { backgroundColor: bg, opacity: off ? 0.45 : 1 },
         variant === 'secondary' && { borderWidth: 1, borderColor: colors.border },
         style,
       ]}
@@ -93,20 +93,21 @@ export function Button({
           <Text style={[s.buttonText, { color: fg }]}>{title}</Text>
         </>
       )}
-    </Pressable>
+    </PressScale>
   );
 }
 
 export function Badge({ label, color }: { label: string; color: string }) {
   return (
-    <View style={[s.badge, { borderColor: color }]}>
+    <View style={[s.badge, { backgroundColor: color + '1F' }]}>
       <Text style={[s.badgeText, { color }]}>{label}</Text>
     </View>
   );
 }
 
 export function Input(props: TextInputProps & { label?: string }) {
-  const { label, style, ...rest } = props;
+  const { label, style, onFocus, onBlur, ...rest } = props;
+  const [focused, setFocused] = useState(false);
   return (
     <View style={{ marginBottom: space.md }}>
       {label ? <Text style={s.label}>{label}</Text> : null}
@@ -115,7 +116,21 @@ export function Input(props: TextInputProps & { label?: string }) {
         autoCapitalize="none"
         autoCorrect={false}
         {...rest}
-        style={[s.input, rest.multiline && { minHeight: 90, textAlignVertical: 'top' }, style]}
+        onFocus={(e) => {
+          setFocused(true);
+          onFocus?.(e);
+        }}
+        onBlur={(e) => {
+          setFocused(false);
+          onBlur?.(e);
+        }}
+        style={[
+          s.input,
+          focused && { borderColor: colors.ink, backgroundColor: colors.surface },
+          rest.multiline && { minHeight: 90, textAlignVertical: 'top' },
+          Platform.OS === 'web' && ({ outlineStyle: 'none', transitionDuration: '160ms' } as unknown as TextStyle),
+          style,
+        ]}
       />
     </View>
   );
@@ -147,10 +162,10 @@ export function SectionTitle({ children }: { children: ReactNode }) {
 
 export function Empty({ icon = 'sparkles-outline', text }: { icon?: IconName; text: string }) {
   return (
-    <View style={s.empty}>
-      <Ionicons name={icon} size={36} color={colors.muted} />
-      <Text style={[s.muted, { marginTop: space.md, textAlign: 'center' }]}>{text}</Text>
-    </View>
+    <FadeIn style={s.empty}>
+      <Ionicons name={icon} size={30} color={colors.border} />
+      <Text style={[s.muted, { marginTop: space.md, textAlign: 'center', lineHeight: 20 }]}>{text}</Text>
+    </FadeIn>
   );
 }
 
@@ -167,7 +182,7 @@ export function ErrorNote({ message, onRetry }: { message: string | null; onRetr
 export function Loading() {
   return (
     <View style={s.empty}>
-      <ActivityIndicator color={colors.accent} />
+      <TypingDots />
     </View>
   );
 }
@@ -189,19 +204,16 @@ export function Toggle({
         <Text style={s.body}>{label}</Text>
         {hint ? <Text style={s.muted}>{hint}</Text> : null}
       </View>
-      <Switch value={value} onValueChange={onChange} trackColor={{ true: colors.accent, false: colors.border }} />
+      <Switch value={value} onValueChange={onChange} trackColor={{ true: colors.ink, false: colors.border }} thumbColor={colors.surface} />
     </Row>
   );
 }
 
 export function Chip({ label, active, onPress }: { label: string; active?: boolean; onPress: () => void }) {
   return (
-    <Pressable
-      onPress={onPress}
-      style={[s.chip, active && { backgroundColor: colors.accent, borderColor: colors.accent }]}
-    >
+    <PressScale onPress={onPress} style={[s.chip, active && { backgroundColor: colors.ink, borderColor: colors.ink }]}>
       <Text style={{ color: active ? colors.accentText : colors.text, fontSize: 13 }}>{label}</Text>
-    </Pressable>
+    </PressScale>
   );
 }
 
@@ -226,7 +238,7 @@ export const s = StyleSheet.create({
   card: {
     backgroundColor: colors.surface,
     borderRadius: radius.md,
-    borderWidth: 1,
+    borderWidth: StyleSheet.hairlineWidth * 2,
     borderColor: colors.border,
     padding: space.lg,
     marginBottom: space.md,
@@ -237,12 +249,12 @@ export const s = StyleSheet.create({
     justifyContent: 'center',
     paddingVertical: 11,
     paddingHorizontal: space.lg,
-    borderRadius: radius.md,
-    minHeight: 42,
+    borderRadius: 999,
+    minHeight: 44,
   },
-  buttonText: { fontWeight: '600', fontSize: 15 },
-  badge: { borderWidth: 1, borderRadius: 999, paddingHorizontal: 9, paddingVertical: 2, alignSelf: 'flex-start' },
-  badgeText: { fontSize: 12, fontWeight: '600' },
+  buttonText: { fontWeight: '600', fontSize: 15, letterSpacing: 0.1 },
+  badge: { borderRadius: 999, paddingHorizontal: 10, paddingVertical: 3, alignSelf: 'flex-start' },
+  badgeText: { fontSize: 12, fontWeight: '600', letterSpacing: 0.2 },
   label: { color: colors.muted, fontSize: 13, marginBottom: 6 },
   input: {
     backgroundColor: colors.surface2,
@@ -254,23 +266,23 @@ export const s = StyleSheet.create({
     paddingVertical: 11,
     fontSize: 16,
   },
-  title: { color: colors.text, fontSize: 20, fontWeight: '700' },
+  title: { color: colors.text, fontSize: 22, fontWeight: '600', letterSpacing: -0.3 },
   section: {
     color: colors.muted,
     fontSize: 12,
-    fontWeight: '700',
-    letterSpacing: 0.8,
+    fontWeight: '600',
+    letterSpacing: 1,
     textTransform: 'uppercase',
-    marginTop: space.lg,
+    marginTop: space.xl,
     marginBottom: space.sm,
   },
   muted: { color: colors.muted, fontSize: 13 },
-  body: { color: colors.text, fontSize: 15, lineHeight: 21 },
+  body: { color: colors.text, fontSize: 15, lineHeight: 22 },
   empty: { alignItems: 'center', justifyContent: 'center', padding: space.xl * 2 },
   error: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#3a1620',
+    backgroundColor: colors.dangerBg,
     borderRadius: radius.md,
     padding: space.md,
     marginBottom: space.md,

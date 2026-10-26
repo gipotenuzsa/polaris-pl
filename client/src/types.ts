@@ -118,7 +118,7 @@ export interface FileEntry {
 }
 
 export interface ProviderStatus {
-  id: 'openrouter' | 'gemini' | 'ollama' | 'chatgpt';
+  id: 'chatgpt';
   label: string;
   model: string;
   available: boolean;

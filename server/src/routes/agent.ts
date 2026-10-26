@@ -96,10 +96,8 @@ export function agentRoutes(app: FastifyInstance, ctx: AppContext): void {
   app.post('/api/providers/chatgpt/callback', async (req) => {
     const { url } = parse(z.object({ url: z.string().min(1).max(4000) }), req.body);
     await ctx.chatgpt.completeFlow(url);
-    // Если других провайдеров нет, вход в ChatGPT — явное намерение им пользоваться: включаем сразу.
-    // При наличии ключей других провайдеров ChatGPT остаётся запасным и включается переключателем.
-    const others = (await ctx.providers.list()).some((p) => p.id !== 'chatgpt' && p.available);
-    if (!others) await ctx.chatgpt.setEnabled(true);
+    // ChatGPT — единственный провайдер: вход означает намерение им пользоваться, включаем сразу.
+    await ctx.chatgpt.setEnabled(true);
     return ctx.chatgpt.status();
   });
 
