@@ -2,7 +2,7 @@
 //   node scripts/build-web.mjs            — экспорт Expo + копирование
 //   node scripts/build-web.mjs --skip-export — только постобработка и копирование готового client/dist
 import { execSync } from 'node:child_process';
-import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -42,6 +42,7 @@ if (!html.includes('rel="manifest"')) {
         '<meta name="apple-mobile-web-app-title" content="Polaris">',
         '<meta name="apple-mobile-web-app-status-bar-style" content="default">',
         '<meta name="color-scheme" content="light">',
+        '<link rel="stylesheet" href="/katex/katex.min.css">',
         '<style>html,body{background:#F5F0E6}',
         '*{scrollbar-width:thin;scrollbar-color:#D6CBB6 transparent}',
         '::-webkit-scrollbar{width:8px;height:8px}::-webkit-scrollbar-track{background:transparent}',
@@ -56,4 +57,12 @@ if (!html.includes('rel="manifest"')) {
 rmSync(outDir, { recursive: true, force: true });
 mkdirSync(outDir, { recursive: true });
 cpSync(dist, outDir, { recursive: true });
+
+// Шрифты и стили KaTeX (формулы в чате) раздаём сами — без внешних CDN; из шрифтов нужен только woff2.
+const katexDist = path.join(clientDir, 'node_modules', 'katex', 'dist');
+mkdirSync(path.join(outDir, 'katex', 'fonts'), { recursive: true });
+cpSync(path.join(katexDist, 'katex.min.css'), path.join(outDir, 'katex', 'katex.min.css'));
+for (const f of readdirSync(path.join(katexDist, 'fonts'))) {
+  if (f.endsWith('.woff2')) cpSync(path.join(katexDist, 'fonts', f), path.join(outDir, 'katex', 'fonts', f));
+}
 console.log(`Веб-клиент скопирован: ${path.relative(root, outDir) || outDir}`);
