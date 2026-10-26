@@ -358,6 +358,29 @@ describe('ChatGptAuth и провайдер', () => {
     expect(await env.ctx.db.query('select * from provider_credentials')).toHaveLength(0);
   });
 
+  it('встроенный веб-поиск передаётся модели; если бэкенд его отвергает — один повтор без него', async () => {
+    let n = 0;
+    const { calls } = await setup({
+      token: () => jsonRes({ access_token: fakeJwt(inFuture(3600)), refresh_token: 'R' }),
+      responses: () =>
+        ++n === 1 ? new Response('unknown tool type web_search', { status: 400 }) : okStream('без поиска'),
+    });
+    await connect();
+    await env.ctx.chatgpt.setEnabled(true);
+    const provider = new ChatGptProvider(env.ctx);
+    const res = await provider.chat({ messages: [{ role: 'user', content: 'новости' }] });
+    expect(res.content).toBe('без поиска');
+    const bodies = calls.filter((c) => c.url.endsWith('/responses')).map((c) => JSON.parse(String(c.init.body)));
+    expect(bodies).toHaveLength(2);
+    expect(bodies[0].tools).toContainEqual({ type: 'web_search' });
+    expect(bodies[1].tools).not.toContainEqual({ type: 'web_search' });
+
+    await provider.chat({ messages: [{ role: 'user', content: 'ещё' }] }); // запомнили: больше не пробуем
+    const later = calls.filter((c) => c.url.endsWith('/responses')).map((c) => JSON.parse(String(c.init.body)));
+    expect(later).toHaveLength(3);
+    expect(later[2].tools).not.toContainEqual({ type: 'web_search' });
+  });
+
   it('история с вызовами инструментов конвертируется в формат Responses', async () => {
     const { calls } = await setup({
       token: () => jsonRes({ access_token: fakeJwt(inFuture(3600)), refresh_token: 'R' }),

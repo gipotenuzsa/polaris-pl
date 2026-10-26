@@ -30,8 +30,7 @@ const ENV_TEMPLATE = `# Настройки Polaris для Windows. Строки 
 #
 # Модели: только ChatGPT по OAuth. Войдите в приложении: Ещё → Настройки → ChatGPT.
 
-# Поиск в интернете: ключ Brave Search API (https://brave.com/search/api/)
-BRAVE_API_KEY=
+# Поиск в интернете встроен в ChatGPT и работает в рамках вашей подписки; отключить: CHATGPT_WEB_SEARCH=false
 
 # Браузер для агента (Playwright + установленный Edge/Chrome). Включайте при необходимости.
 BROWSER_ENABLED=false

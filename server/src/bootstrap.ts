@@ -33,7 +33,7 @@ import { notesTools } from './tools/notesTools.js';
 import { ToolRegistry } from './tools/registry.js';
 import { tasksTools } from './tools/tasksTools.js';
 import type { AnyTool } from './tools/types.js';
-import { readUrlTool, webSearchTool } from './tools/web.js';
+import { readUrlTool } from './tools/web.js';
 import { silentLogger, type Logger } from './util/logger.js';
 
 export interface BootstrapOptions {
@@ -104,7 +104,6 @@ export async function createContext(opts: BootstrapOptions): Promise<AppContext>
     ...tasksTools(),
     ...historyTools(),
     readUrlTool(config.allowPrivateNetwork),
-    ...(config.braveApiKey ? [webSearchTool(config.braveApiKey, ctx.fetch)] : []),
     ...(config.browser.enabled ? browserTools(new BrowserService(config, log), config.allowPrivateNetwork) : []),
     ...(opts.extraTools ?? []),
   ];

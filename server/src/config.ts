@@ -63,7 +63,7 @@ const envSchema = z.object({
   CHATGPT_MODEL: str('gpt-6-luna'),
   CHATGPT_MODELS: str('gpt-6-luna,gpt-5.1-codex,gpt-5-codex,gpt-5'),
 
-  BRAVE_API_KEY: optStr,
+  CHATGPT_WEB_SEARCH: bool(true),
 
   BROWSER_ENABLED: bool(false),
   BROWSER_WS_ENDPOINT: optStr,
@@ -142,9 +142,10 @@ export interface Config {
       backendUrl: string;
       defaultModel: string;
       models: string[];
+      /** Встроенный веб-поиск модели (инструмент web_search Responses API) */
+      webSearch: boolean;
     };
   };
-  braveApiKey?: string;
   browser: { enabled: boolean; wsEndpoint?: string; executablePath?: string; maxMemoryMb: number };
   budget: { dailyTokens: number; dailyUsd: number; runTokens: number; runUsd: number };
   prices: Record<string, ModelPrice>;
@@ -236,12 +237,12 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
         originator: e.CHATGPT_ORIGINATOR,
         backendUrl: e.CHATGPT_BACKEND_URL.replace(/\/+$/, ''),
         defaultModel: e.CHATGPT_MODEL,
+        webSearch: e.CHATGPT_WEB_SEARCH,
         models: e.CHATGPT_MODELS.split(',')
           .map((s) => s.trim())
           .filter(Boolean),
       },
     },
-    braveApiKey: e.BRAVE_API_KEY,
     browser: {
       enabled: e.BROWSER_ENABLED,
       wsEndpoint: e.BROWSER_WS_ENDPOINT,

@@ -43,7 +43,6 @@ export const TASK_STATUS: Record<string, { label: string; color: string }> = {
 };
 
 export const TOOL_LABELS: Record<string, string> = {
-  web_search: 'Поиск в интернете',
   read_url: 'Чтение страницы',
   browser_read: 'Браузер: чтение',
   browser_act: 'Браузер: действия',

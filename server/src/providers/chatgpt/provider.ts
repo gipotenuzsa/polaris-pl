@@ -12,6 +12,8 @@ export class ChatGptProvider implements ModelProvider {
   readonly id = 'chatgpt' as const;
   readonly label = 'ChatGPT (OAuth)';
   private readonly sessionId = randomUUID();
+  /** Бэкенд отверг инструмент web_search — дальше работаем без него, чтобы не ломать ответы. */
+  private searchRejected = false;
 
   /** opts.model — разовая подмена модели (проверка доступности), без изменения настроек. */
   constructor(
@@ -31,7 +33,8 @@ export class ChatGptProvider implements ModelProvider {
   async chat(req: ChatRequest): Promise<ChatResponse> {
     const cfg = this.ctx.config.providers.chatgpt;
     const model = await this.currentModel();
-    const body = JSON.stringify(buildResponsesBody(model, req.messages, req.tools));
+    const bodyFor = (search: boolean) => JSON.stringify(buildResponsesBody(model, req.messages, req.tools, search));
+    let search = cfg.webSearch && !this.searchRejected;
 
     const send = async (forceRefresh: boolean) => {
       const { accessToken, accountId } = await this.ctx.chatgpt.getAccess(forceRefresh).catch((err: unknown) => {
@@ -50,7 +53,7 @@ export class ChatGptProvider implements ModelProvider {
       return providerFetch('chatgpt', this.ctx.fetch, `${cfg.backendUrl}/responses`, {
         method: 'POST',
         headers,
-        body,
+        body: bodyFor(search),
         signal: req.signal,
       });
     };
@@ -60,7 +63,13 @@ export class ChatGptProvider implements ModelProvider {
       res = await send(false);
     } catch (err) {
       if (err instanceof ProviderError && err.status === 401) res = await send(true);
-      else throw err;
+      else if (search && err instanceof ProviderError && err.kind === 'bad_request' && /web[_ ]?search|tool/i.test(err.message)) {
+        // Возможно, бэкенд не принимает web_search: пробуем тот же запрос без него и запоминаем это.
+        this.ctx.log.warn({ err: err.message }, 'ChatGPT отверг запрос с web_search, повторяю без встроенного поиска');
+        search = false;
+        res = await send(false);
+        this.searchRejected = true;
+      } else throw err;
     }
 
     try {

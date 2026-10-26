@@ -27,7 +27,5 @@ services:
         sync: false
       - key: SUPABASE_SERVICE_KEY
         sync: false
-      - key: BRAVE_API_KEY
-        sync: false
       - key: INSTANCE_TIMEZONE
         value: Asia/Almaty

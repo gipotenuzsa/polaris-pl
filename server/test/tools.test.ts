@@ -1,13 +1,12 @@
 import http from 'node:http';
 import type { AddressInfo } from 'node:net';
 import zlib from 'node:zlib';
-import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { buildMessages } from '../src/agent/context.js';
 import type { MessageRow } from '../src/services/conversations.js';
 import { htmlToText } from '../src/tools/htmlText.js';
 import { assertPublicUrl, isPrivateIp, safeFetch } from '../src/tools/ssrf.js';
-import { readUrlTool, webSearchTool } from '../src/tools/web.js';
-import { createTestEnv } from './helpers.js';
+import { readUrlTool } from '../src/tools/web.js';
 
 describe('isPrivateIp', () => {
   it.each([
@@ -155,51 +154,6 @@ describe('safeFetch и read_url (локальный сервер)', () => {
     const tool = readUrlTool(true);
     await expect(tool.execute({ url: `${base}/bin` }, ctx)).rejects.toThrow(/Неподдерживаемый тип/);
     await expect(tool.execute({ url: `${base}/missing` }, ctx)).rejects.toThrow(/HTTP 404/);
-  });
-});
-
-describe('web_search (Brave)', () => {
-  it('формирует запрос с токеном в заголовке и форматирует результаты', async () => {
-    const fetchMock = vi.fn(
-      async () =>
-        new Response(
-          JSON.stringify({
-            web: {
-              results: [
-                { title: 'Результат', url: 'https://a.example', description: 'Описание <b>жирное</b>', age: '2 дня' },
-              ],
-            },
-          }),
-          { status: 200 },
-        ),
-    );
-    const tool = webSearchTool('BRAVE-KEY', fetchMock as unknown as typeof fetch);
-    const r = await tool.execute({ query: 'погода в Алматы', count: 3, freshness: 'day' }, {
-      signal: undefined,
-    } as never);
-    expect(r.content).toContain('1. Результат');
-    expect(r.content).toContain('https://a.example');
-    expect(r.content).not.toContain('<b>');
-    const [url, init] = fetchMock.mock.calls[0] as unknown as [URL, RequestInit];
-    expect(url.searchParams.get('q')).toBe('погода в Алматы');
-    expect(url.searchParams.get('count')).toBe('3');
-    expect(url.searchParams.get('freshness')).toBe('pd');
-    expect(url.toString()).not.toContain('BRAVE-KEY');
-    expect((init.headers as Record<string, string>)['x-subscription-token']).toBe('BRAVE-KEY');
-  });
-
-  it('ошибка API не раскрывает ключ', async () => {
-    const tool = webSearchTool(
-      'K',
-      (async () => new Response('forbidden', { status: 403 })) as unknown as typeof fetch,
-    );
-    await expect(tool.execute({ query: 'x' }, { signal: undefined } as never)).rejects.toThrow(/HTTP 403/);
-  });
-
-  it('инструмент появляется только при наличии ключа', async () => {
-    const env = await createTestEnv({ config: { BRAVE_API_KEY: 'k' } });
-    expect(env.ctx.tools.get('web_search')).toBeDefined();
-    await env.close();
   });
 });
 

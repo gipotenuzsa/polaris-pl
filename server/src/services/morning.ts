@@ -80,7 +80,7 @@ export class MorningService {
         system,
         since: now,
         maxSteps: 6,
-        toolFilter: (t) => ['web_search', 'read_url', 'memory_search', 'note_list', 'get_time'].includes(t.name),
+        toolFilter: (t) => ['read_url', 'memory_search', 'note_list', 'get_time'].includes(t.name),
       });
       if (outcome.status === 'done') {
         // Сводка приходит в единый разговор, как сообщение от Polaris; отдельный чат остаётся в архиве.

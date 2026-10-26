@@ -164,7 +164,7 @@ describe('чат', () => {
     expect(req.tools!.map((t) => t.name)).toEqual(
       expect.arrayContaining(['memory_save', 'note_create', 'file_write', 'task_create', 'read_url']),
     );
-    expect(req.tools!.map((t) => t.name)).not.toContain('web_search'); // нет BRAVE_API_KEY
+    expect(req.tools!.map((t) => t.name)).not.toContain('web_search'); // поиск встроен в модель, отдельного инструмента нет
     expect(req.tools!.map((t) => t.name)).not.toContain('browser_read'); // браузер выключен
   });
 
@@ -856,7 +856,7 @@ describe('единый разговор, сжатие контекста, ист
     env = await createTestEnv({
       extraTools: [
         defineTool({
-          name: 'web_search',
+          name: 'browser_read',
           description: 'поиск',
           schema: z.object({ query: z.string() }),
           describe: (a) => `поиск ${a.query}`,
@@ -869,7 +869,7 @@ describe('единый разговор, сжатие контекста, ист
         const sys = req.messages[0]!.content;
         const last = req.messages.at(-1)!;
         if (sys.includes('субагент-исследователь')) {
-          return last.role === 'tool' ? { content: 'ВЫЖИМКА: главное за 3 пункта' } : { toolCalls: [toolCall('web_search', { query: 'тема' }, 's1')] };
+          return last.role === 'tool' ? { content: 'ВЫЖИМКА: главное за 3 пункта' } : { toolCalls: [toolCall('browser_read', { query: 'тема' }, 's1')] };
         }
         if (last.role === 'tool') return { content: `итог: ${last.content}` };
         return { toolCalls: [toolCall('research', { question: 'Сравни три источника про тему' }, 'r1')] };

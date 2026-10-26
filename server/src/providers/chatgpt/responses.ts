@@ -45,19 +45,24 @@ export function buildResponsesBody(
   model: string,
   messages: ChatMessage[],
   tools?: ToolSpec[],
+  webSearch = false,
 ): Record<string, unknown> {
   const { instructions, input } = toResponsesInput(messages);
   return {
     model,
     instructions,
     input,
-    tools: (tools ?? []).map((t) => ({
-      type: 'function',
-      name: t.name,
-      description: t.description,
-      parameters: t.parameters,
-      strict: false,
-    })),
+    tools: [
+      ...(tools ?? []).map((t) => ({
+        type: 'function',
+        name: t.name,
+        description: t.description,
+        parameters: t.parameters,
+        strict: false,
+      })),
+      // Встроенный поиск по интернету: выполняется на стороне OpenAI в рамках подписки, отдельный ключ не нужен.
+      ...(webSearch ? [{ type: 'web_search' }] : []),
+    ],
     tool_choice: 'auto',
     parallel_tool_calls: false,
     store: false,
