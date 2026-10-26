@@ -208,7 +208,6 @@ function Bubble({
                 <Ionicons name="refresh-outline" size={16} color={colors.muted} />
               </Pressable>
             ) : null}
-            {m.model ? <Text style={{ color: colors.border, fontSize: 11, marginLeft: 6 }}>{m.model}</Text> : null}
           </View>
         </View>
       )}
