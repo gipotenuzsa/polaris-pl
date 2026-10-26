@@ -2,7 +2,7 @@ import * as Clipboard from 'expo-clipboard';
 import katex from 'katex';
 import { createElement, Fragment, useState, type ReactNode } from 'react';
 import { Linking, Platform, Pressable, ScrollView, Text, View } from 'react-native';
-import { colors, radius, space } from './theme';
+import { colors, fonts, radius, space } from './theme';
 
 const MONO = Platform.select({ ios: 'Menlo', android: 'monospace', default: "ui-monospace, 'SF Mono', Consolas, monospace" });
 const IS_WEB = Platform.OS === 'web';
@@ -105,7 +105,7 @@ function MathView({ math, display }: { math: Formula; display: boolean }) {
   if (IS_WEB && html) {
     return display
       ? createElement('div', {
-          style: { overflowX: 'auto', overflowY: 'hidden', padding: '4px 0', margin: '4px 0 8px', fontSize: 17 },
+          style: { overflowX: 'auto', overflowY: 'hidden', padding: '2px 0', margin: '2px 0 6px', fontSize: window.innerWidth < 430 ? 15 : 17 },
           dangerouslySetInnerHTML: { __html: html },
         })
       : createElement('span', { dangerouslySetInnerHTML: { __html: html } });
@@ -181,7 +181,9 @@ function inline(text: string, maths: Formula[], keyBase: string): ReactNode[] {
 }
 
 const linkStyle = { color: colors.accent, textDecorationLine: 'underline' } as const;
-const base = { color: colors.text, fontSize: 16, lineHeight: 25 } as const;
+const sans = { color: colors.text, fontSize: 16, lineHeight: 25 } as const;
+/** Текст ответа — с засечками (как книжная страница), служебные элементы (таблицы, код) — без. */
+const base = { ...sans, fontFamily: fonts.serif, fontSize: 17, lineHeight: 27 } as const;
 
 // ── Блоки ─────────────────────────────────────────────────────────────────────
 
@@ -237,7 +239,7 @@ function Table({ rows, align, maths, k }: { rows: string[][]; align: ('left' | '
               <Text
                 key={c}
                 selectable
-                style={[base, { flex: 1, minWidth: 116, fontSize: 15, lineHeight: 22, paddingHorizontal: 10, paddingVertical: 7, textAlign: align[c] ?? 'left', fontWeight: r === 0 ? '700' : '400' }]}
+                style={[sans, { flex: 1, minWidth: 116, fontSize: 15, lineHeight: 22, paddingHorizontal: 10, paddingVertical: 7, textAlign: align[c] ?? 'left', fontWeight: r === 0 ? '700' : '400' }]}
               >
                 {inline(cell, maths, `${k}-${r}-${c}`)}
               </Text>

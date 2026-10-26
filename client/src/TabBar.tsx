@@ -1,11 +1,11 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, type Tabs } from 'expo-router';
-import { useEffect, useState, type ComponentProps } from 'react';
-import { Animated, Platform, Pressable, Text, View } from 'react-native';
+import { useEffect, useRef, useState, type ComponentProps } from 'react';
+import { Animated, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useKeyboardOpen } from './keyboard';
 import { useStatus } from './status';
-import { colors, shadow } from './theme';
+import { colors } from './theme';
 import type { IconName } from './ui';
 
 type TabBarProps = Parameters<NonNullable<ComponentProps<typeof Tabs>['tabBar']>>[0];
@@ -16,11 +16,12 @@ const ITEMS: { name: 'index' | 'tasks' | 'memory'; label: string; icon: IconName
   { name: 'memory', label: 'Память', icon: 'sparkles-outline', active: 'sparkles' },
 ];
 
-const PAD = 5;
+const INDICATOR = 26;
+const MAX_WIDTH = 460;
 
 /**
- * Плавающая панель на три вкладки: чернильная «таблетка» скользит под активным пунктом.
- * Отступ снизу берётся из safe-area, поэтому подписи не обрезаются на Android и iPhone.
+ * Плоская панель на три вкладки: тонкая линия сверху, без плашек и теней. Активный пункт отмечен
+ * терракотовым штрихом, который плавно скользит между вкладками. Отступ снизу берётся из safe-area.
  */
 export function TabBar({ state }: TabBarProps) {
   const insets = useSafeAreaInsets();
@@ -32,51 +33,44 @@ export function TabBar({ state }: TabBarProps) {
 
   const current = state.routes[state.index]?.name;
   const index = ITEMS.findIndex((i) => i.name === current);
-  const itemW = width > 0 ? (width - PAD * 2) / ITEMS.length : 0;
+  const itemW = width > 0 ? Math.min(width, MAX_WIDTH) / ITEMS.length : 0;
 
+  const placed = useRef(false);
   useEffect(() => {
     if (index < 0 || itemW === 0) return;
-    Animated.spring(slide, { toValue: index * itemW, speed: 22, bounciness: 7, useNativeDriver: Platform.OS !== 'web' }).start();
+    const target = index * itemW + (itemW - INDICATOR) / 2;
+    if (!placed.current) {
+      placed.current = true;
+      slide.setValue(target); // при первом показе штрих сразу на своём месте, без «заезда» слева
+      return;
+    }
+    Animated.spring(slide, { toValue: target, speed: 22, bounciness: 5, useNativeDriver: Platform.OS !== 'web' }).start();
   }, [index, itemW, slide]);
 
   if (keyboardOpen) return null; // клавиатура открыта — место нужнее ленте и полю ввода
   return (
     <View
+      onLayout={(e) => setWidth(e.nativeEvent.layout.width)}
       style={{
         backgroundColor: colors.bg,
+        borderTopWidth: StyleSheet.hairlineWidth * 2,
+        borderTopColor: colors.border,
         alignItems: 'center',
-        paddingTop: 2,
-        paddingBottom: Math.max(insets.bottom - 6, 8),
-        paddingHorizontal: 16,
+        paddingBottom: Math.max(insets.bottom - 8, 6),
       }}
     >
-      <View
-        onLayout={(e) => setWidth(e.nativeEvent.layout.width)}
-        style={[
-          {
-            flexDirection: 'row',
-            width: '100%',
-            maxWidth: 420,
-            padding: PAD,
-            borderRadius: 28,
-            backgroundColor: colors.surface,
-            borderWidth: 1,
-            borderColor: colors.border,
-          },
-          shadow,
-        ]}
-      >
+      <View style={{ flexDirection: 'row', width: '100%', maxWidth: MAX_WIDTH }}>
         {itemW > 0 && index >= 0 ? (
           <Animated.View
             pointerEvents="none"
             style={{
               position: 'absolute',
-              top: PAD,
-              left: PAD,
-              bottom: PAD,
-              width: itemW,
-              borderRadius: 25,
-              backgroundColor: colors.ink,
+              top: -1,
+              left: 0,
+              width: INDICATOR,
+              height: 2.5,
+              borderRadius: 2,
+              backgroundColor: colors.accent,
               transform: [{ translateX: slide }],
             }}
           />
@@ -93,32 +87,26 @@ export function TabBar({ state }: TabBarProps) {
               onPress={() => {
                 if (!focused) router.navigate(item.name === 'index' ? '/' : item.name === 'tasks' ? '/tasks' : '/memory');
               }}
-              style={{ flex: 1, height: 48, alignItems: 'center', justifyContent: 'center' }}
+              style={{ flex: 1, height: 52, alignItems: 'center', justifyContent: 'center' }}
             >
               <View>
-                <Ionicons
-                  name={focused ? item.active : item.icon}
-                  size={21}
-                  color={focused ? colors.accentText : colors.muted}
-                />
+                <Ionicons name={focused ? item.active : item.icon} size={22} color={focused ? colors.text : colors.muted} />
                 {badge > 0 ? (
                   <View
                     style={{
                       position: 'absolute',
-                      top: -4,
-                      right: -10,
-                      minWidth: 16,
-                      height: 16,
+                      top: -3,
+                      right: -9,
+                      minWidth: 15,
+                      height: 15,
                       borderRadius: 8,
                       paddingHorizontal: 4,
                       backgroundColor: colors.accent,
                       alignItems: 'center',
                       justifyContent: 'center',
-                      borderWidth: 1.5,
-                      borderColor: focused ? colors.ink : colors.surface,
                     }}
                   >
-                    <Text style={{ color: colors.accentText, fontSize: 10, fontWeight: '700' }}>{badge > 9 ? '9+' : badge}</Text>
+                    <Text style={{ color: colors.accentText, fontSize: 9, fontWeight: '700' }}>{badge > 9 ? '9+' : badge}</Text>
                   </View>
                 ) : null}
               </View>
@@ -126,10 +114,10 @@ export function TabBar({ state }: TabBarProps) {
                 numberOfLines={1}
                 style={{
                   marginTop: 2,
-                  fontSize: 11,
-                  fontWeight: '600',
-                  letterSpacing: 0.2,
-                  color: focused ? colors.accentText : colors.muted,
+                  fontSize: 10.5,
+                  fontWeight: focused ? '600' : '500',
+                  letterSpacing: 0.3,
+                  color: focused ? colors.text : colors.muted,
                 }}
               >
                 {item.label}

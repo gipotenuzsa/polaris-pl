@@ -14,7 +14,7 @@ import { useKeyboardOpen } from './keyboard';
 import { Markdown } from './Markdown';
 import { FadeIn, PressScale, TypingDots } from './motion';
 import { useStatus } from './status';
-import { colors, radius, shadow, space, toolLabel } from './theme';
+import { colors, fonts, radius, shadow, space, toolLabel } from './theme';
 import type { Approval, Attachment, Message, SearchHit } from './types';
 import { Button, ErrorNote, Loading, notify } from './ui';
 
@@ -119,6 +119,46 @@ function ToolRow({ m, approval, onResolved }: { m: Message; approval?: Approval;
   );
 }
 
+/** Строка в ленте: один или несколько подряд вызовов инструментов, свёрнутых в одну тихую строку. */
+interface Row {
+  id: string;
+  first: Message;
+  tools?: Message[];
+}
+
+const plural = (n: number) => `${n} ${n % 10 === 1 && n % 100 !== 11 ? 'действие' : n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 10 || n % 100 >= 20) ? 'действия' : 'действий'}`;
+
+function ToolGroup({ items }: { items: Message[] }) {
+  const [open, setOpen] = useState(false);
+  const failed = items.some((m) => m.status === 'error' || m.status === 'rejected');
+  const names = [...new Set(items.map((m) => toolLabel(m.toolName ?? 'инструмент')))];
+  const one = items.length === 1 ? items[0]! : null;
+  const title = one
+    ? `${names[0]}${one.content ? ` · ${open ? clean(one.content) : shorten(clean(one.content), 70)}` : ''}`
+    : `${plural(items.length)} · ${names.join(', ')}`;
+  return (
+    <FadeIn distance={4} style={{ marginVertical: 2, alignItems: 'flex-start' }}>
+      <Pressable onPress={() => setOpen(!open)} style={{ flexDirection: 'row', alignItems: 'center', maxWidth: '96%', paddingVertical: 4, paddingRight: 8 }}>
+        <Ionicons name={failed ? 'alert-circle-outline' : 'checkmark'} size={14} color={failed ? colors.danger : colors.success} />
+        <Text style={{ color: colors.muted, marginLeft: 6, fontSize: 13, flexShrink: 1 }} numberOfLines={open && one ? undefined : 1}>
+          {title}
+        </Text>
+        {!one ? <Ionicons name={open ? 'chevron-up' : 'chevron-down'} size={12} color={colors.muted} style={{ marginLeft: 4 }} /> : null}
+      </Pressable>
+      {open && !one ? (
+        <View style={{ marginLeft: 7, paddingLeft: 12, borderLeftWidth: 1, borderLeftColor: colors.border, marginVertical: 2 }}>
+          {items.map((m) => (
+            <Text key={m.id} style={{ color: colors.muted, fontSize: 13, lineHeight: 19, marginBottom: 4 }} numberOfLines={4}>
+              <Text style={{ fontWeight: '600' }}>{toolLabel(m.toolName ?? 'инструмент')}</Text>
+              {m.content ? ` — ${clean(m.content)}` : ''}
+            </Text>
+          ))}
+        </View>
+      ) : null}
+    </FadeIn>
+  );
+}
+
 function CopyButton({ text }: { text: string }) {
   const [done, setDone] = useState(false);
   return (
@@ -160,11 +200,14 @@ function Bubble({
   onOpen,
   onRegenerate,
   onEdit,
+  isLast,
 }: {
   m: Message;
   onOpen: (a: Attachment) => void;
   onRegenerate?: () => void;
   onEdit?: () => void;
+  /** Последний ответ в ленте: только у него показываем «копировать» и «повторить», остальное — тишина. */
+  isLast?: boolean;
 }) {
   const mine = m.role === 'user';
   if (!m.content && !m.attachments?.length) return null;
@@ -201,6 +244,7 @@ function Bubble({
       ) : (
         <View style={{ width: '100%' }}>
           <Markdown text={m.content} />
+          {isLast ? (
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
             <CopyButton text={m.content} />
             {onRegenerate ? (
@@ -209,6 +253,7 @@ function Bubble({
               </Pressable>
             ) : null}
           </View>
+          ) : null}
         </View>
       )}
     </FadeIn>
@@ -290,7 +335,7 @@ export function ChatView({ id, main = false }: { id: string; main?: boolean }) {
   const [sending, setSending] = useState(false);
   const [picks, setPicks] = useState<Picked[]>([]);
   const [viewing, setViewing] = useState<Attachment | null>(null);
-  const list = useRef<FlatList<Message>>(null);
+  const list = useRef<FlatList<Row>>(null);
   const lastCount = useRef('');
   /** Пользователь у конца ленты: новые сообщения и стриминг подкручивают её вниз; если он листает вверх — не трогаем. */
   const atBottom = useRef(true);
@@ -345,6 +390,17 @@ export function ChatView({ id, main = false }: { id: string; main?: boolean }) {
   const blocked = (data?.pendingApprovals.length ?? 0) > 0;
   const canSend = (!!text.trim() || picks.length > 0) && !sending && !running && !blocked;
   const room = MAX_PICKS - picks.length;
+  // Подряд идущие вызовы инструментов сворачиваем в одну строку; запросы на подтверждение остаются отдельными карточками.
+  const rows = useMemo(() => {
+    const out: Row[] = [];
+    for (const m of messages) {
+      const groupable = m.role === 'tool' && !(m.status === 'pending' && m.approvalId && approvals.has(m.approvalId));
+      const last = out[out.length - 1];
+      if (groupable && last?.tools) last.tools.push(m);
+      else out.push(groupable ? { id: m.id, first: m, tools: [m] } : { id: m.id, first: m });
+    }
+    return out;
+  }, [messages, approvals]);
   const needsLogin = main && !!status.data && !status.data.providers.some((p) => p.available);
   const speechOk =
     Platform.OS === 'web' &&
@@ -443,14 +499,14 @@ export function ChatView({ id, main = false }: { id: string; main?: boolean }) {
   // Переход к найденному сообщению
   useEffect(() => {
     if (jump === null) return;
-    const idx = messages.findIndex((m) => m.seq === jump);
+    const idx = rows.findIndex((r) => r.first.seq === jump || r.tools?.some((t) => t.seq === jump));
     if (idx < 0) return;
     const t = setTimeout(() => {
       list.current?.scrollToIndex({ index: idx, viewPosition: 0.3, animated: true });
       setJump(null);
     }, 150);
     return () => clearTimeout(t);
-  }, [jump, messages]);
+  }, [jump, rows]);
 
   const addPicks = async (get: () => Promise<Picked[]>) => {
     try {
@@ -595,8 +651,8 @@ export function ChatView({ id, main = false }: { id: string; main?: boolean }) {
         ) : null}
         <FlatList
           ref={list}
-          data={messages}
-          keyExtractor={(m) => m.id}
+          data={rows}
+          keyExtractor={(r) => r.id}
           style={{ width: '100%' }}
           scrollEventThrottle={64}
           onLayout={() => {
@@ -638,7 +694,7 @@ export function ChatView({ id, main = false }: { id: string; main?: boolean }) {
             !loading ? (
               <FadeIn style={{ flex: 1, justifyContent: 'center', paddingBottom: space.xl * 2 }}>
                 <Text style={{ color: colors.accent, fontSize: 26, marginBottom: space.sm }}>✦</Text>
-                <Text style={{ color: colors.text, fontSize: 26, fontWeight: '600', letterSpacing: -0.5 }}>
+                <Text style={{ color: colors.text, fontSize: 30, fontFamily: fonts.serif, fontWeight: '400', letterSpacing: -0.6 }}>
                   {main ? 'Я рядом. С чего начнём?' : 'Чем займёмся?'}
                 </Text>
                 <Text style={{ color: colors.muted, fontSize: 15, lineHeight: 22, marginTop: 6, marginBottom: space.xl }}>
@@ -665,13 +721,16 @@ export function ChatView({ id, main = false }: { id: string; main?: boolean }) {
               </FadeIn>
             ) : undefined
           }
-          renderItem={({ item, index }) => {
-            const prev = messages[index - 1];
+          renderItem={({ item: row, index }) => {
+            const item = row.first;
+            const prev = rows[index - 1]?.first;
             const chip = !prev || dayKey(prev.createdAt) !== dayKey(item.createdAt) ? <DayChip iso={item.createdAt} /> : null;
             return (
               <>
                 {chip}
-                {item.role === 'tool' ? (
+                {row.tools ? (
+                  <ToolGroup items={row.tools} />
+                ) : item.role === 'tool' ? (
                   <ToolRow
                     m={item}
                     approval={item.approvalId ? approvals.get(item.approvalId) : undefined}
@@ -683,6 +742,7 @@ export function ChatView({ id, main = false }: { id: string; main?: boolean }) {
                   <Bubble
                     m={item}
                     onOpen={setViewing}
+                    isLast={item.id === lastAssistantId}
                     onRegenerate={item.id === lastAssistantId && !running && !blocked && item.provider === 'chatgpt' ? regenerate : undefined}
                     onEdit={item.id === lastUserId && !running && !blocked ? editLast : undefined}
                   />
@@ -774,6 +834,10 @@ export function ChatView({ id, main = false }: { id: string; main?: boolean }) {
               value={text}
               onChangeText={setText}
               placeholder="Сообщение Polaris"
+              autoComplete="off"
+              textContentType="none"
+              importantForAutofill="no"
+              autoCapitalize="sentences"
               placeholderTextColor={colors.muted}
               multiline
               numberOfLines={1}

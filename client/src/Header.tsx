@@ -4,7 +4,7 @@ import type { ReactNode } from 'react';
 import { Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FadeIn, PressScale } from './motion';
-import { colors } from './theme';
+import { colors, fonts } from './theme';
 import type { IconName } from './ui';
 
 export interface HeaderAction {
@@ -27,12 +27,10 @@ export function IconButton({ icon, label, onPress, badge, primary }: HeaderActio
         width: 42,
         height: 42,
         borderRadius: 21,
-        marginLeft: 8,
+        marginLeft: 2,
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: primary ? colors.ink : colors.surface,
-        borderWidth: primary ? 0 : 1,
-        borderColor: colors.border,
+        backgroundColor: primary ? colors.ink : 'transparent',
       }}
     >
       <Ionicons name={icon} size={20} color={primary ? colors.accentText : colors.text} />
@@ -77,34 +75,48 @@ export function Header({
   const insets = useSafeAreaInsets();
   const router = useRouter();
   return (
-    <FadeIn distance={6} style={{ paddingTop: insets.top + 10, paddingHorizontal: 20, paddingBottom: 8 }}>
-      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-        {back ? (
-          <View style={{ marginRight: 10, marginLeft: -6 }}>
-            <IconButton
-              icon="chevron-back"
-              label="Назад"
-              onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))}
-            />
-          </View>
-        ) : null}
-        <View style={{ flex: 1 }}>
-          <Text style={{ color: colors.text, fontSize: 32, fontWeight: '600', letterSpacing: -1 }} numberOfLines={1}>
-            {title}
-          </Text>
-          {subtitle ? (
-            <Text style={{ color: colors.muted, fontSize: 14, marginTop: 1 }} numberOfLines={1}>
-              {subtitle}
-            </Text>
+    <FadeIn
+      distance={6}
+      style={{ paddingTop: insets.top + 10, paddingHorizontal: 20, paddingBottom: 8, alignItems: 'center' }}
+    >
+      <View style={{ width: '100%', maxWidth: 760 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+          {back ? (
+            <View style={{ marginRight: 10, marginLeft: -6 }}>
+              <IconButton
+                icon="chevron-back"
+                label="Назад"
+                onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))}
+              />
+            </View>
           ) : null}
+          <View style={{ flex: 1 }}>
+            <Text
+              style={{
+                color: colors.text,
+                fontSize: 34,
+                fontFamily: fonts.serif,
+                fontWeight: '400',
+                letterSpacing: -0.8,
+              }}
+              numberOfLines={1}
+            >
+              {title}
+            </Text>
+            {subtitle ? (
+              <Text style={{ color: colors.muted, fontSize: 14, marginTop: 1 }} numberOfLines={1}>
+                {subtitle}
+              </Text>
+            ) : null}
+          </View>
+          <View style={{ flexDirection: 'row' }}>
+            {actions.map((a) => (
+              <IconButton key={a.label} {...a} />
+            ))}
+          </View>
         </View>
-        <View style={{ flexDirection: 'row' }}>
-          {actions.map((a) => (
-            <IconButton key={a.label} {...a} />
-          ))}
-        </View>
+        {children}
       </View>
-      {children}
     </FadeIn>
   );
 }

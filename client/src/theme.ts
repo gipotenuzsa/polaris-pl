@@ -1,9 +1,20 @@
+import { Platform } from 'react-native';
+
+/** Шрифт с засечками для заголовков и текста ответов: на iPhone — New York/Georgia, на Android — системный serif. */
+export const fonts = {
+  serif: Platform.select({
+    web: "ui-serif, 'New York', 'Iowan Old Style', Georgia, 'Times New Roman', serif",
+    ios: 'Georgia',
+    default: 'serif',
+  }) as string,
+};
+
 // Тёплая бежевая палитра: бумага, чернила, один терракотовый акцент.
 export const colors = {
   bg: '#F5F0E6',
   surface: '#FCFAF5',
   surface2: '#EEE7D9',
-  border: '#E3DACA',
+  border: '#E7DFCE',
   text: '#2B2620',
   muted: '#8C8272',
   /** терракота: активные элементы, ссылки, индикаторы */
@@ -27,10 +38,10 @@ export const radius = { sm: 10, md: 14, lg: 22 };
 /** Мягкая тень — единственная «глубина» в интерфейсе. */
 export const shadow = {
   shadowColor: '#5B4A2E',
-  shadowOpacity: 0.1,
-  shadowRadius: 18,
-  shadowOffset: { width: 0, height: 6 },
-  elevation: 3,
+  shadowOpacity: 0.06,
+  shadowRadius: 22,
+  shadowOffset: { width: 0, height: 8 },
+  elevation: 2,
 } as const;
 
 export const TASK_STATUS: Record<string, { label: string; color: string }> = {
