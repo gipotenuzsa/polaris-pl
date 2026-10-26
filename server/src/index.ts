@@ -2,6 +2,7 @@ import { pino } from 'pino';
 import { buildApp } from './app.js';
 import { createContext } from './bootstrap.js';
 import { loadConfig } from './config.js';
+import { startSelfPing } from './util/keepalive.js';
 
 async function main(): Promise<void> {
   const config = loadConfig();
@@ -13,6 +14,7 @@ async function main(): Promise<void> {
   const ctx = await createContext({ config, log: logger });
   const app = await buildApp(ctx, { logger });
   await ctx.scheduler.start();
+  const stopPing = startSelfPing({ publicUrl: config.publicUrl, enabled: config.selfPing, log: logger });
   await app.listen({ port: config.port, host: config.host });
   logger.info({ port: config.port, tools: ctx.tools.all().map((t) => t.name) }, 'Polaris запущен');
 
@@ -22,6 +24,7 @@ async function main(): Promise<void> {
     stopping = true;
     logger.info({ signal }, 'Останавливаюсь…');
     ctx.scheduler.stop();
+    stopPing?.();
     await Promise.race([ctx.runs.idle(), new Promise((r) => setTimeout(r, 10_000))]);
     await app.close();
     await ctx.db.close();

@@ -1,7 +1,9 @@
-# Не даёт бесплатному Render «заснуть» и запускает планировщик (задачи, напоминания, сводка), пока сервер без другого пинга.
-# Нужны секреты репозитория: POLARIS_URL (https://….onrender.com) и CRON_SECRET (как на сервере).
+# Будит бесплатный Render, если он всё же уснул (после пробуждения сервер сам держит себя «живым» самопингом),
+# и запускает планировщик (задачи, напоминания, сводка). Секреты не обязательны:
+#  - адрес берётся из секрета POLARIS_URL, а если его нет — из переменной репозитория POLARIS_URL или значения ниже;
+#  - CRON_SECRET (как на сервере) нужен только для внешнего запуска /internal/tick; без него пинг просто будит сервис.
 # GitHub запускает расписание с задержкой в несколько минут — точный пинг даёт pg_cron в Supabase
-# (supabase/optional/pg_cron_jobs.sql); при его настройке этот workflow можно отключить.
+# (supabase/optional/pg_cron_jobs.sql); при его настройке этот workflow можно отключить (переменная KEEPALIVE_ENABLED=false).
 name: Keep alive
 
 on:
@@ -16,11 +18,10 @@ jobs:
     steps:
       - name: Ping /health и /internal/tick
         env:
-          POLARIS_URL: ${{ secrets.POLARIS_URL }}
+          POLARIS_URL: ${{ secrets.POLARIS_URL || vars.POLARIS_URL || 'https://polaris-pl.onrender.com' }}
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
         run: |
-          if [ -z "$POLARIS_URL" ]; then echo "POLARIS_URL не задан — пропускаю"; exit 0; fi
-          curl -fsS --retry 5 --retry-delay 20 --max-time 90 "$POLARIS_URL/health"
+          curl -fsS --retry 5 --retry-delay 20 --max-time 120 "$POLARIS_URL/health"
           echo
           if [ -n "$CRON_SECRET" ]; then
             curl -fsS --max-time 90 -X POST -H "x-cron-secret: $CRON_SECRET" "$POLARIS_URL/internal/tick"

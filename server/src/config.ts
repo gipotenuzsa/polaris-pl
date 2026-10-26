@@ -78,6 +78,7 @@ const envSchema = z.object({
 
   INSTANCE_TIMEZONE: str('UTC'),
   SCHEDULER_ENABLED: bool(true),
+  SELF_PING: bool(true),
   SCHEDULER_TICK_SECONDS: int(30),
   MAX_CONCURRENT_RUNS: int(2),
   APPROVAL_TTL_HOURS: int(48),
@@ -151,6 +152,8 @@ export interface Config {
   prices: Record<string, ModelPrice>;
   timezone: string;
   scheduler: { enabled: boolean; tickSeconds: number; maxConcurrentRuns: number };
+  /** Сервер сам обращается к своему публичному адресу, чтобы бесплатный Render не усыплял его (только production + https PUBLIC_URL). */
+  selfPing: boolean;
   approvalTtlHours: number;
   agent: { maxSteps: number; contextTokens: number; toolTimeoutMs: number };
 }
@@ -257,6 +260,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     },
     prices,
     timezone: e.INSTANCE_TIMEZONE,
+    selfPing: e.SELF_PING && isProd,
     scheduler: {
       enabled: e.SCHEDULER_ENABLED,
       tickSeconds: e.SCHEDULER_TICK_SECONDS,
