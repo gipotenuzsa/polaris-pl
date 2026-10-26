@@ -202,7 +202,7 @@ function CodeBlock({ code, lang }: { code: string; lang: string }) {
           <Text style={{ color: done ? colors.success : colors.muted, fontSize: 12 }}>{done ? 'Скопировано' : 'Копировать'}</Text>
         </Pressable>
       </View>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ padding: space.md, paddingTop: 6 }}>
+      <ScrollView horizontal contentContainerStyle={{ padding: space.md, paddingTop: 6 }}>
         <Text style={{ fontFamily: MONO, fontSize: 13, lineHeight: 20, color: colors.text }} selectable>
           {code}
         </Text>
@@ -221,7 +221,7 @@ const splitRow = (line: string) =>
 
 function Table({ rows, align, maths, k }: { rows: string[][]; align: ('left' | 'center' | 'right')[]; maths: Formula[]; k: string }) {
   return (
-    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: space.sm }} contentContainerStyle={{ flexGrow: 1 }}>
+    <ScrollView horizontal style={{ marginBottom: space.sm }} contentContainerStyle={{ flexGrow: 1 }}>
       <View style={{ borderWidth: 1, borderColor: colors.border, borderRadius: radius.sm, overflow: 'hidden', flexGrow: 1 }}>
         {rows.map((row, r) => (
           <View
