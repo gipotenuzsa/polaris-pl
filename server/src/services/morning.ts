@@ -5,6 +5,11 @@ import { dayKey, parseHHMM, zonedParts, zonedTimeToUtc } from '../util/time.js';
 
 /** Утренняя сводка: раз в сутки в настроенное время агент собирает данные и пишет дайджест в отдельный чат. */
 export class MorningService {
+  private preparing = 0;
+
+  get isPreparing(): boolean {
+    return this.preparing > 0;
+  }
   constructor(private readonly ctx: AppContext) {}
 
   /** Вызывается планировщиком каждый тик. Возвращает true, если сводка запущена. */
@@ -64,6 +69,15 @@ export class MorningService {
 
   /** Создаёт сводку немедленно (по расписанию или кнопкой «Сформировать сейчас»). */
   async generate(): Promise<{ conversationId: string }> {
+    this.preparing++;
+    try {
+      return await this.prepare();
+    } finally {
+      this.preparing--;
+    }
+  }
+
+  private async prepare(): Promise<{ conversationId: string }> {
     const app = this.ctx;
     const now = app.clock();
     const s = await app.settings.getMorning();

@@ -4,6 +4,7 @@ import { useEffect, type ReactNode } from 'react';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AuthProvider, useAuth } from '../src/auth';
+import { ChatWorkspace } from '../src/ChatWorkspace';
 import { registerServiceWorker } from '../src/push';
 import { StatusProvider } from '../src/status';
 import { colors } from '../src/theme';
@@ -33,32 +34,34 @@ export default function RootLayout() {
         <StatusProvider>
           <StatusBar style="dark" />
           <Gate>
-            <Stack
-              screenOptions={{
-                headerStyle: { backgroundColor: colors.bg },
-                headerTintColor: colors.text,
-                headerTitleStyle: { fontWeight: '600', fontSize: 18 },
-                animation: 'slide_from_right',
-                headerShadowVisible: false,
-                contentStyle: { backgroundColor: colors.bg },
-                headerBackTitle: 'Назад',
-              }}
-            >
-              <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-              <Stack.Screen name="login" options={{ headerShown: false }} />
-              <Stack.Screen name="chats" options={{ headerShown: false }} />
-              <Stack.Screen name="share" options={{ headerShown: false }} />
-              <Stack.Screen name="more" options={{ headerShown: false }} />
-              <Stack.Screen name="approvals" options={{ headerShown: false }} />
-              <Stack.Screen name="chat/[id]" options={{ title: 'Чат' }} />
-              <Stack.Screen name="task/new" options={{ title: 'Новая задача', presentation: 'modal' }} />
-              <Stack.Screen name="task/[id]" options={{ title: 'Задача' }} />
-              <Stack.Screen name="settings" options={{ title: 'Настройки' }} />
-              <Stack.Screen name="journal" options={{ title: 'Журнал действий' }} />
-              <Stack.Screen name="notes" options={{ title: 'Заметки' }} />
-              <Stack.Screen name="files" options={{ title: 'Файлы' }} />
-              <Stack.Screen name="inbox" options={{ title: 'Уведомления' }} />
-            </Stack>
+            <ChatWorkspace>
+              <Stack
+                screenOptions={{
+                  headerStyle: { backgroundColor: colors.bg },
+                  headerTintColor: colors.text,
+                  headerTitleStyle: { fontWeight: '600', fontSize: 18 },
+                  animation: 'slide_from_right',
+                  headerShadowVisible: false,
+                  contentStyle: { backgroundColor: colors.bg },
+                  headerBackTitle: 'Назад',
+                }}
+              >
+                <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+                <Stack.Screen name="login" options={{ headerShown: false }} />
+                <Stack.Screen name="chats" options={{ headerShown: false }} />
+                <Stack.Screen name="share" options={{ headerShown: false }} />
+                <Stack.Screen name="more" options={{ headerShown: false }} />
+                <Stack.Screen name="approvals" options={{ headerShown: false }} />
+                <Stack.Screen name="chat/[id]" options={{ headerShown: false }} />
+                <Stack.Screen name="task/new" options={{ title: 'Новая задача', presentation: 'modal' }} />
+                <Stack.Screen name="task/[id]" options={{ title: 'Задача' }} />
+                <Stack.Screen name="settings" options={{ title: 'Настройки' }} />
+                <Stack.Screen name="journal" options={{ title: 'Журнал действий' }} />
+                <Stack.Screen name="notes" options={{ title: 'Заметки' }} />
+                <Stack.Screen name="files" options={{ title: 'Файлы' }} />
+                <Stack.Screen name="inbox" options={{ title: 'Уведомления' }} />
+              </Stack>
+            </ChatWorkspace>
           </Gate>
         </StatusProvider>
       </AuthProvider>

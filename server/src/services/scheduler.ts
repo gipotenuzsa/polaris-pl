@@ -20,6 +20,10 @@ export class Scheduler {
 
   constructor(private readonly ctx: AppContext) {}
 
+  get isTicking(): boolean {
+    return this.ticking;
+  }
+
   async start(): Promise<void> {
     const { scheduler } = this.ctx.config;
     if (!scheduler.enabled || this.timer) return;
@@ -42,7 +46,7 @@ export class Scheduler {
 
   async tick(): Promise<TickResult> {
     const empty: TickResult = { remindersFired: 0, approvalsExpired: 0, tasksStarted: 0, morningStarted: false };
-    if (this.ticking) return { ...empty, skipped: true };
+    if (this.ticking || this.ctx.data.deleting) return { ...empty, skipped: true };
     this.ticking = true;
     try {
       const app = this.ctx;

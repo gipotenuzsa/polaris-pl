@@ -58,11 +58,16 @@ export class SupabaseFileStore implements FileStore {
   async list(prefix = ''): Promise<FileEntry[]> {
     await this.ensureBucket();
     const rel = prefix ? normalizePath(prefix) : '';
-    const { data, error } = await this.client.storage
-      .from(this.bucket)
-      .list(rel, { limit: 1000, sortBy: { column: 'name', order: 'asc' } });
-    if (error) throw new Error(`Supabase Storage: ${error.message}`);
-    return (data ?? [])
+    const entries = [];
+    for (let offset = 0; ; offset += 1000) {
+      const { data, error } = await this.client.storage
+        .from(this.bucket)
+        .list(rel, { limit: 1000, offset, sortBy: { column: 'name', order: 'asc' } });
+      if (error) throw new Error(`Supabase Storage: ${error.message}`);
+      entries.push(...(data ?? []));
+      if (!data || data.length < 1000) break;
+    }
+    return entries
       .filter((f) => f.name !== '.emptyFolderPlaceholder')
       .map((f) => ({
         path: rel ? `${rel}/${f.name}` : f.name,

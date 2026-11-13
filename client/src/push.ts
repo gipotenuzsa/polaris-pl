@@ -60,12 +60,23 @@ export async function enablePush(): Promise<void> {
   if (permission !== 'granted') throw new Error('Разрешение на уведомления не выдано');
   const reg = await registration();
   const { publicKey } = await api.pushStatus();
-  const sub =
-    (await reg.pushManager.getSubscription()) ??
-    (await reg.pushManager.subscribe({
-      userVisibleOnly: true,
-      applicationServerKey: urlBase64ToUint8Array(publicKey),
-    }));
+  const applicationServerKey = urlBase64ToUint8Array(publicKey);
+  let sub = await reg.pushManager.getSubscription();
+  if (sub) {
+    const previousKey = new Uint8Array(sub.options.applicationServerKey ?? new ArrayBuffer(0));
+    if (
+      previousKey.length !== applicationServerKey.length ||
+      previousKey.some((byte, index) => byte !== applicationServerKey[index])
+    ) {
+      // A full data reset rotates the server's key; old device subscriptions must be replaced.
+      await sub.unsubscribe();
+      sub = null;
+    }
+  }
+  sub ??= await reg.pushManager.subscribe({
+    userVisibleOnly: true,
+    applicationServerKey,
+  });
   const json = sub.toJSON();
   if (!json.endpoint || !json.keys?.p256dh || !json.keys?.auth) throw new Error('Браузер вернул неполную подписку');
   await api.pushSubscribe({ endpoint: json.endpoint, keys: { p256dh: json.keys.p256dh, auth: json.keys.auth } });

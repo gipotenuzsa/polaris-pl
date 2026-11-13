@@ -3,6 +3,7 @@ import { useRouter } from 'expo-router';
 import type { ReactNode } from 'react';
 import { Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useChatWorkspace } from './ChatWorkspace';
 import { FadeIn, PressScale } from './motion';
 import { colors, fonts } from './theme';
 import type { IconName } from './ui';
@@ -20,6 +21,7 @@ export interface HeaderAction {
 export function IconButton({ icon, label, onPress, badge, primary }: HeaderAction) {
   return (
     <PressScale
+      accessibilityRole="button"
       accessibilityLabel={label}
       onPress={onPress}
       scale={0.92}
@@ -74,6 +76,7 @@ export function Header({
 }) {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const workspace = useChatWorkspace();
   return (
     <FadeIn
       distance={6}
@@ -88,6 +91,10 @@ export function Header({
                 label="Назад"
                 onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))}
               />
+            </View>
+          ) : !workspace.sidebarVisible ? (
+            <View style={{ marginRight: 10, marginLeft: -6 }}>
+              <IconButton icon="menu-outline" label="Открыть меню" onPress={workspace.toggleSidebar} />
             </View>
           ) : null}
           <View style={{ flex: 1 }}>

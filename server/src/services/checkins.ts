@@ -34,6 +34,10 @@ export class CheckinsService {
 
   constructor(private readonly ctx: AppContext) {}
 
+  get isRunning(): boolean {
+    return this.running;
+  }
+
   /** Вызывается планировщиком каждый тик. Возвращает true, если проверка запущена. */
   async maybeRun(now: Date): Promise<boolean> {
     const app = this.ctx;
@@ -66,7 +70,9 @@ export class CheckinsService {
     const sub = await app.conversations.create('Проверка', 'task');
     try {
       const data = await app.morning.gatherData(now);
-      const earlier = previous.length ? `\n\nТвои прошлые сообщения (не повторяй их):\n${previous.map((m) => `- ${m.content.slice(0, 200)}`).join('\n')}` : '';
+      const earlier = previous.length
+        ? `\n\nТвои прошлые сообщения (не повторяй их):\n${previous.map((m) => `- ${m.content.slice(0, 200)}`).join('\n')}`
+        : '';
       await app.conversations.add({
         conversationId: sub.id,
         role: 'user',
@@ -88,7 +94,12 @@ export class CheckinsService {
         [main.id, `🔔 ${text}`],
       );
       await app.db.query('update conversations set updated_at = now() where id = $1', [main.id]);
-      await app.notifications.create({ kind: 'info', title: 'Polaris', body: text.slice(0, 300), ref: { conversationId: main.id } });
+      await app.notifications.create({
+        kind: 'info',
+        title: 'Polaris',
+        body: text.slice(0, 300),
+        ref: { conversationId: main.id },
+      });
       return { posted: true, text };
     } finally {
       await app.conversations.remove(sub.id).catch(() => undefined);

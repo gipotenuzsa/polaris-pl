@@ -12,6 +12,7 @@ export const fonts = {
 // Тёплая бежевая палитра: бумага, чернила, один терракотовый акцент.
 export const colors = {
   bg: '#F5F0E6',
+  sidebar: '#EEE7DB',
   surface: '#FCFAF5',
   surface2: '#EEE7D9',
   border: '#E7DFCE',

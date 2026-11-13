@@ -119,8 +119,7 @@ export function rowsToChat(
       out.push({ role: 'user', content: r.content + note, ...(images?.length ? { images } : {}) });
     } else if (r.role === 'system') {
       if (r.tool_name !== 'compaction') out.push({ role: 'system', content: r.content }); // маркер сжатия — только для интерфейса
-    }
-    else if (r.role === 'assistant') {
+    } else if (r.role === 'assistant') {
       out.push({ role: 'assistant', content: r.content, ...(r.tool_calls?.length ? { toolCalls: r.tool_calls } : {}) });
     } else {
       out.push({ role: 'tool', toolCallId: r.tool_call_id ?? '', name: r.tool_name ?? '', content: r.content });
@@ -161,7 +160,7 @@ export class ConversationService {
                 where m.conversation_id = c.id and m.role in ('user', 'assistant') and m.content <> ''
                 order by m.seq desc limit 1) as preview
          from conversations c
-        where c.kind = $1 and not c.is_main
+        where c.kind = $1
         order by c.pinned desc, c.updated_at desc
         limit $2`,
       [kind, limit],
@@ -198,7 +197,11 @@ export class ConversationService {
   }
 
   async setSummary(id: string, summary: string, upto: number): Promise<void> {
-    await this.ctx.db.query('update conversations set summary = $2, summary_upto = $3 where id = $1', [id, summary, upto]);
+    await this.ctx.db.query('update conversations set summary = $2, summary_upto = $3 where id = $1', [
+      id,
+      summary,
+      upto,
+    ]);
   }
 
   /** Поиск по тексту реплик пользователя и ассистента (в том числе уже сжатых в сводку). */
@@ -232,7 +235,8 @@ export class ConversationService {
     const { upto } = await this.summaryState(id);
     if (last.seq <= upto) throw conflict('Это сообщение уже вошло в сводку — изменить его нельзя', 'compacted');
     await this.ctx.db.query('delete from messages where conversation_id = $1 and seq > $2', [id, last.seq]);
-    if (!keepUser) await this.ctx.db.query('delete from messages where conversation_id = $1 and seq = $2', [id, last.seq]);
+    if (!keepUser)
+      await this.ctx.db.query('delete from messages where conversation_id = $1 and seq = $2', [id, last.seq]);
     await this.ctx.db.query('update conversations set updated_at = now() where id = $1', [id]);
     return { content: last.content };
   }
@@ -286,6 +290,34 @@ export class ConversationService {
   }
 
   // ── Вложения ───────────────────────────────────────────────────────────────
+
+  /** A failed attachment must never leave behind a message without its pictures. */
+  async addUserMessage(conversationId: string, content: string, attachmentIds: string[]): Promise<MessageRow> {
+    return this.ctx.db.transaction(async (tx) => {
+      if (attachmentIds.length) {
+        const available = await tx.query<{ id: string }>(
+          'select id from attachments where id = any($1::uuid[]) and message_id is null for update',
+          [attachmentIds],
+        );
+        if (new Set(attachmentIds).size !== attachmentIds.length || available.length !== attachmentIds.length) {
+          throw conflict('Фото уже отправлено или больше недоступно. Прикрепите его заново.', 'attachment_unavailable');
+        }
+      }
+      const rows = await tx.query<MessageRow>(
+        "insert into messages (conversation_id, role, content) values ($1, 'user', $2) returning *",
+        [conversationId, content],
+      );
+      const message = rows[0]!;
+      if (attachmentIds.length) {
+        await tx.query('update attachments set message_id = $2 where id = any($1::uuid[])', [
+          attachmentIds,
+          message.id,
+        ]);
+      }
+      await tx.query('update conversations set updated_at = now() where id = $1', [conversationId]);
+      return message;
+    });
+  }
 
   async createAttachment(a: { name: string; mime: string; data: string }): Promise<AttachmentMeta> {
     const rows = await this.ctx.db.query<AttachmentMeta>(

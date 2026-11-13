@@ -87,7 +87,8 @@ export function chatRoutes(app: FastifyInstance, ctx: AppContext): void {
     const { id } = parse(idParams, req.params);
     await ctx.conversations.get(id);
     if (ctx.runs.isRunning(id)) throw conflict('Агент ещё отвечает', 'busy');
-    if ((await ctx.conversations.pendingToolCount(id)) > 0) throw conflict('Сначала решите по ожидающему действию', 'pending_approval');
+    if ((await ctx.conversations.pendingToolCount(id)) > 0)
+      throw conflict('Сначала решите по ожидающему действию', 'pending_approval');
     const last = await ctx.conversations.rewind(id, true);
     if (!last) throw conflict('Нечего повторять', 'empty');
     ctx.runs.startChat(id);
@@ -100,7 +101,8 @@ export function chatRoutes(app: FastifyInstance, ctx: AppContext): void {
     const { id } = parse(idParams, req.params);
     await ctx.conversations.get(id);
     if (ctx.runs.isRunning(id)) throw conflict('Агент ещё отвечает', 'busy');
-    if ((await ctx.conversations.pendingToolCount(id)) > 0) throw conflict('Сначала решите по ожидающему действию', 'pending_approval');
+    if ((await ctx.conversations.pendingToolCount(id)) > 0)
+      throw conflict('Сначала решите по ожидающему действию', 'pending_approval');
     const last = await ctx.conversations.rewind(id, false);
     if (!last) throw conflict('Нечего менять', 'empty');
     return { content: last.content };
@@ -145,7 +147,7 @@ export function chatRoutes(app: FastifyInstance, ctx: AppContext): void {
   app.delete('/api/conversations/:id', async (req) => {
     const { id } = parse(idParams, req.params);
     await ctx.conversations.get(id);
-    await ctx.conversations.remove(id);
+    await ctx.data.exclusive(() => ctx.db.transaction((tx) => ctx.data.removeConversations(tx, [id])));
     return { ok: true };
   });
 
@@ -165,8 +167,7 @@ export function chatRoutes(app: FastifyInstance, ctx: AppContext): void {
     if ((await ctx.conversations.pendingToolCount(id)) > 0) {
       throw conflict('Сначала подтвердите или отклоните ожидающее действие', 'pending_approval');
     }
-    const message = await ctx.conversations.add({ conversationId: id, role: 'user', content });
-    await ctx.conversations.attach(attachmentIds, message.id);
+    const message = await ctx.conversations.addUserMessage(id, content, attachmentIds);
     if (conv.title === 'Новый чат') {
       await ctx.conversations.rename(id, content.replace(/\s+/g, ' ').slice(0, 60) || 'Изображение');
     }

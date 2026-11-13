@@ -95,6 +95,11 @@ const toStepDto = (r: StepRow): TaskStepDto => ({
 
 export class TaskService {
   private readonly controllers = new Map<string, AbortController>();
+  private readonly starting = new Set<string>();
+
+  get isExecuting(): boolean {
+    return this.starting.size > 0 || this.controllers.size > 0;
+  }
 
   constructor(private readonly ctx: AppContext) {}
 
@@ -222,10 +227,13 @@ export class TaskService {
 
   /** Запускает прогон взятой задачи в фоне. */
   start(task: TaskRow): void {
-    void this.execute(task).catch(async (err: unknown) => {
-      this.ctx.log.error({ err: errorMessage(err), taskId: task.id }, 'Сбой прогона задачи');
-      await this.finish(task, { status: 'failed', error: errorMessage(err) }).catch(() => undefined);
-    });
+    this.starting.add(task.id);
+    void this.execute(task)
+      .catch(async (err: unknown) => {
+        this.ctx.log.error({ err: errorMessage(err), taskId: task.id }, 'Сбой прогона задачи');
+        await this.finish(task, { status: 'failed', error: errorMessage(err) }).catch(() => undefined);
+      })
+      .finally(() => this.starting.delete(task.id));
   }
 
   async execute(task: TaskRow): Promise<RunOutcome> {

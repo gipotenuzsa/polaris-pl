@@ -1,36 +1,28 @@
 import { Ionicons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
-import { Stack, useRouter } from 'expo-router';
+import { useRouter } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, FlatList, Image, KeyboardAvoidingView, Modal, Platform, Pressable, Text, TextInput, View } from 'react-native';
+import { FlatList, Image, KeyboardAvoidingView, Modal, Platform, Pressable, Text, TextInput, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { api, attachmentSource } from './api';
 import { ApprovalCard } from './ApprovalCard';
-import { MAX_PICKS, pickImages, picksFromFiles, previewUri, type Picked } from './attachments';
+import type { Picked } from './attachments';
+import { ChatComposer, type ComposerHandle } from './ChatComposer';
+import { useChatWorkspace } from './ChatWorkspace';
+import { Dialog } from './Dialog';
 import { shorten } from './format';
-import { Header } from './Header';
+import { IconButton } from './Header';
 import { useLoad } from './hooks';
 import { useKeyboardOpen } from './keyboard';
 import { Markdown } from './Markdown';
 import { FadeIn, PressScale, TypingDots } from './motion';
 import { useStatus } from './status';
-import { colors, fonts, radius, shadow, space, toolLabel } from './theme';
+import { colors, fonts, radius, space, toolLabel } from './theme';
 import type { Approval, Attachment, Message, SearchHit } from './types';
-import { Button, ErrorNote, Loading, notify } from './ui';
+import { ErrorNote, Loading, type HoverState } from './ui';
 
 const PAGE = 60;
 
-/** Минимальное описание Web Speech API (в TypeScript его типов нет). */
-interface SpeechRec {
-  lang: string;
-  interimResults: boolean;
-  continuous: boolean;
-  onresult: (e: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => void;
-  onend: () => void;
-  onerror: () => void;
-  start: () => void;
-  stop: () => void;
-}
 const dayKey = (iso: string) => new Date(iso).toDateString();
 const dayFmt = new Intl.DateTimeFormat('ru-RU', { day: 'numeric', month: 'long' });
 function dayLabel(iso: string): string {
@@ -43,7 +35,9 @@ function dayLabel(iso: string): string {
 function DayChip({ iso }: { iso: string }) {
   return (
     <View style={{ alignItems: 'center', marginTop: space.lg, marginBottom: space.xs }}>
-      <Text style={{ color: colors.muted, fontSize: 12, fontWeight: '600', letterSpacing: 0.6 }}>{dayLabel(iso).toUpperCase()}</Text>
+      <Text style={{ color: colors.muted, fontSize: 12, fontWeight: '600', letterSpacing: 0.6 }}>
+        {dayLabel(iso).toUpperCase()}
+      </Text>
     </View>
   );
 }
@@ -73,11 +67,11 @@ const STATUS_COLOR = {
 } as const;
 
 const SUGGESTIONS = [
-  'Что у меня на сегодня?',
-  'Запомни: я люблю зелёный чай',
-  'Найди свежие новости про ИИ',
-  'Напомни через час размяться',
-];
+  { icon: 'image-outline', label: 'Разобрать фото', prompt: 'Помоги разобраться с изображением. ' },
+  { icon: 'globe-outline', label: 'Найти ответ', prompt: 'Помоги найти информацию: ' },
+  { icon: 'create-outline', label: 'Написать текст', prompt: 'Помоги написать текст: ' },
+  { icon: 'sunny-outline', label: 'Спланировать день', prompt: 'Помоги составить план на день. ' },
+] as const;
 
 const WIDE = { width: '100%', maxWidth: 760, alignSelf: 'center' } as const;
 
@@ -126,7 +120,8 @@ interface Row {
   tools?: Message[];
 }
 
-const plural = (n: number) => `${n} ${n % 10 === 1 && n % 100 !== 11 ? 'действие' : n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 10 || n % 100 >= 20) ? 'действия' : 'действий'}`;
+const plural = (n: number) =>
+  `${n} ${n % 10 === 1 && n % 100 !== 11 ? 'действие' : n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 10 || n % 100 >= 20) ? 'действия' : 'действий'}`;
 
 function ToolGroup({ items }: { items: Message[] }) {
   const [open, setOpen] = useState(false);
@@ -138,17 +133,46 @@ function ToolGroup({ items }: { items: Message[] }) {
     : `${plural(items.length)} · ${names.join(', ')}`;
   return (
     <FadeIn distance={4} style={{ marginVertical: 2, alignItems: 'flex-start' }}>
-      <Pressable onPress={() => setOpen(!open)} style={{ flexDirection: 'row', alignItems: 'center', maxWidth: '96%', paddingVertical: 4, paddingRight: 8 }}>
-        <Ionicons name={failed ? 'alert-circle-outline' : 'checkmark'} size={14} color={failed ? colors.danger : colors.success} />
-        <Text style={{ color: colors.muted, marginLeft: 6, fontSize: 13, flexShrink: 1 }} numberOfLines={open && one ? undefined : 1}>
+      <Pressable
+        onPress={() => setOpen(!open)}
+        style={{ flexDirection: 'row', alignItems: 'center', maxWidth: '96%', paddingVertical: 4, paddingRight: 8 }}
+      >
+        <Ionicons
+          name={failed ? 'alert-circle-outline' : 'checkmark'}
+          size={14}
+          color={failed ? colors.danger : colors.success}
+        />
+        <Text
+          style={{ color: colors.muted, marginLeft: 6, fontSize: 13, flexShrink: 1 }}
+          numberOfLines={open && one ? undefined : 1}
+        >
           {title}
         </Text>
-        {!one ? <Ionicons name={open ? 'chevron-up' : 'chevron-down'} size={12} color={colors.muted} style={{ marginLeft: 4 }} /> : null}
+        {!one ? (
+          <Ionicons
+            name={open ? 'chevron-up' : 'chevron-down'}
+            size={12}
+            color={colors.muted}
+            style={{ marginLeft: 4 }}
+          />
+        ) : null}
       </Pressable>
       {open && !one ? (
-        <View style={{ marginLeft: 7, paddingLeft: 12, borderLeftWidth: 1, borderLeftColor: colors.border, marginVertical: 2 }}>
+        <View
+          style={{
+            marginLeft: 7,
+            paddingLeft: 12,
+            borderLeftWidth: 1,
+            borderLeftColor: colors.border,
+            marginVertical: 2,
+          }}
+        >
           {items.map((m) => (
-            <Text key={m.id} style={{ color: colors.muted, fontSize: 13, lineHeight: 19, marginBottom: 4 }} numberOfLines={4}>
+            <Text
+              key={m.id}
+              style={{ color: colors.muted, fontSize: 13, lineHeight: 19, marginBottom: 4 }}
+              numberOfLines={4}
+            >
               <Text style={{ fontWeight: '600' }}>{toolLabel(m.toolName ?? 'инструмент')}</Text>
               {m.content ? ` — ${clean(m.content)}` : ''}
             </Text>
@@ -180,7 +204,9 @@ function CopyButton({ text }: { text: string }) {
 function Photos({ items, onOpen }: { items: Attachment[]; onOpen: (a: Attachment) => void }) {
   const size = items.length === 1 ? 220 : 120;
   return (
-    <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'flex-end', maxWidth: '86%', marginBottom: 4 }}>
+    <View
+      style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'flex-end', maxWidth: '86%', marginBottom: 4 }}
+    >
       {items.map((a) => (
         <PressScale key={a.id} scale={0.98} onPress={() => onOpen(a)} style={{ margin: 3 }}>
           <Image
@@ -231,7 +257,12 @@ function Bubble({
         </View>
       ) : null}
       {mine && onEdit ? (
-        <Pressable onPress={onEdit} hitSlop={8} accessibilityLabel="Изменить сообщение" style={{ padding: 4, marginTop: 2 }}>
+        <Pressable
+          onPress={onEdit}
+          hitSlop={8}
+          accessibilityLabel="Изменить сообщение"
+          style={{ padding: 4, marginTop: 2 }}
+        >
           <Ionicons name="create-outline" size={15} color={colors.muted} />
         </Pressable>
       ) : null}
@@ -245,14 +276,19 @@ function Bubble({
         <View style={{ width: '100%' }}>
           <Markdown text={m.content} />
           {isLast ? (
-          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-            <CopyButton text={m.content} />
-            {onRegenerate ? (
-              <Pressable onPress={onRegenerate} hitSlop={8} accessibilityLabel="Повторить ответ" style={{ padding: 4, marginLeft: 4 }}>
-                <Ionicons name="refresh-outline" size={16} color={colors.muted} />
-              </Pressable>
-            ) : null}
-          </View>
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <CopyButton text={m.content} />
+              {onRegenerate ? (
+                <Pressable
+                  onPress={onRegenerate}
+                  hitSlop={8}
+                  accessibilityLabel="Повторить ответ"
+                  style={{ padding: 4, marginLeft: 4 }}
+                >
+                  <Ionicons name="refresh-outline" size={16} color={colors.muted} />
+                </Pressable>
+              ) : null}
+            </View>
           ) : null}
         </View>
       )}
@@ -265,309 +301,99 @@ function useSmoothText(target: string): string {
   const [shown, setShown] = useState(0);
   useEffect(() => {
     if (shown === target.length) return;
-    const next = shown > target.length ? target.length : Math.min(target.length, shown + Math.max(1, Math.ceil((target.length - shown) / 8)));
+    const next =
+      shown > target.length
+        ? target.length
+        : Math.min(target.length, shown + Math.max(1, Math.ceil((target.length - shown) / 8)));
     const t = setTimeout(() => setShown(next), shown > target.length ? 0 : 24);
     return () => clearTimeout(t);
   }, [target, shown]);
   return target.slice(0, Math.min(shown, target.length));
 }
 
-function SendButton({
-  enabled,
-  running,
-  onPress,
-}: {
-  enabled: boolean;
-  running: boolean;
-  onPress: () => void;
-}) {
-  const [v] = useState(() => new Animated.Value(enabled ? 1 : 0));
-  useEffect(() => {
-    Animated.spring(v, {
-      toValue: enabled ? 1 : 0,
-      speed: 24,
-      bounciness: 6,
-      useNativeDriver: Platform.OS !== 'web',
-    }).start();
-  }, [enabled, v]);
-  return (
-    <PressScale
-      onPress={enabled || running ? onPress : undefined}
-      accessibilityLabel={running ? 'Остановить' : 'Отправить'}
-      scale={0.9}
-      style={{
-        width: 38,
-        height: 38,
-        borderRadius: 19,
-        alignItems: 'center',
-        justifyContent: 'center',
-        backgroundColor: enabled || running ? colors.ink : colors.surface2,
-      }}
-    >
-      <Animated.View style={{ transform: [{ translateY: v.interpolate({ inputRange: [0, 1], outputRange: [2, 0] }) }] }}>
-        {running ? (
-          <View style={{ width: 12, height: 12, borderRadius: 3, backgroundColor: colors.accentText }} />
-        ) : (
-          <Ionicons name="arrow-up" size={20} color={enabled ? colors.accentText : colors.muted} />
-        )}
-      </Animated.View>
-    </PressScale>
-  );
-}
-
-/** Лента разговора. `main` — единый сквозной разговор (главная вкладка); иначе — отдельная тема из архива. */
-export function ChatView({ id, main = false }: { id: string; main?: boolean }) {
+/** Independent conversations share the same thread view and composer. */
+export function ChatView({ id: initialId }: { id?: string }) {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { refresh: refreshStatus, unread } = useStatus();
+  const workspace = useChatWorkspace();
+  const { refresh: refreshStatus } = useStatus();
+  const [id, setId] = useState(initialId);
   const store = useRef(new Map<string, Message>());
+  const uploaded = useRef(new Map<string, string>());
+  const composer = useRef<ComposerHandle>(null);
+  const list = useRef<FlatList<Row>>(null);
+  const atBottom = useRef(true);
+  const initialising = useRef(true);
+  const settled = useRef(false);
   const [exhausted, setExhausted] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [query, setQuery] = useState('');
-  const [hits, setHits] = useState<SearchHit[]>([]);
+  const [hits, setHits] = useState<{ query: string; items: SearchHit[] } | null>(null);
   const [jump, setJump] = useState<number | null>(null);
-  const [listening, setListening] = useState(false);
-  const recRef = useRef<SpeechRec | null>(null);
-  const status = useLoad(() => (main ? api.status() : Promise.resolve(null)));
-  const keyboardOpen = useKeyboardOpen();
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [text, setText] = useState('');
-  const [sending, setSending] = useState(false);
-  const [picks, setPicks] = useState<Picked[]>([]);
   const [viewing, setViewing] = useState<Attachment | null>(null);
-  const list = useRef<FlatList<Row>>(null);
-  const lastCount = useRef('');
-  /** Пользователь у конца ленты: новые сообщения и стриминг подкручивают её вниз; если он листает вверх — не трогаем. */
-  const atBottom = useRef(true);
-  /** Прокрутка к концу ленты. На вебе scrollToEnd у FlatList бывает no-op при неизвестной высоте строк — дублируем прямой прокруткой DOM-узла. */
-  const toEnd = (animated: boolean) => {
-    const l = list.current;
-    if (!l) return;
-    l.scrollToEnd({ animated });
-    if (Platform.OS === 'web') {
-      const node = (l as unknown as { getScrollableNode?: () => HTMLElement | null }).getScrollableNode?.();
-      if (node) node.scrollTop = node.scrollHeight;
-    }
-  };
-  /** Первую секунду после загрузки события прокрутки не считаем действиями пользователя (лента ещё достраивается). */
-  const initialising = useRef(true);
-  const picksRef = useRef<Picked[]>([]);
-  useEffect(() => {
-    picksRef.current = picks;
-  }, [picks]);
-
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [sending, setSending] = useState(false);
+  const status = useLoad(() => api.status(), 30_000);
+  const keyboardOpen = useKeyboardOpen();
   const { data, error, loading, refresh } = useLoad(
     async () => {
-      // Грузим только последнюю страницу и накапливаем её в памяти: длинный разговор не тянем целиком на каждом опросе.
-      const d = await api.conversation(id, { limit: PAGE });
-      for (const m of d.messages) store.current.set(m.id, m);
-      return { ...d, messages: [...store.current.values()].sort((a, b) => a.seq - b.seq) };
+      if (!id)
+        return {
+          conversation: null,
+          messages: [] as Message[],
+          running: false,
+          live: '',
+          pendingApprovals: [] as Approval[],
+        };
+      const result = await api.conversation(id, { limit: PAGE });
+      for (const message of result.messages) store.current.set(message.id, message);
+      return { ...result, messages: [...store.current.values()].sort((a, b) => a.seq - b.seq) };
     },
-    // пока агент работает — опрашиваем часто, пока ждём подтверждения — реже; в главном разговоре подтягиваем и сообщения Polaris, пришедшие сами
-    (d) => (d?.running ? 400 : d && d.pendingApprovals.length > 0 ? 4000 : main ? 15_000 : undefined),
+    (result) => (result?.running ? 400 : id ? 15_000 : undefined),
     [id],
   );
 
-  const loadEarlier = async () => {
-    const first = store.current.size ? Math.min(...[...store.current.values()].map((m) => m.seq)) : 0;
-    if (!first || loadingMore) return;
-    setLoadingMore(true);
-    try {
-      const d = await api.conversation(id, { limit: PAGE, before: first });
-      for (const m of d.messages) store.current.set(m.id, m);
-      if (d.messages.length < PAGE) setExhausted(true);
-      await refresh();
-    } catch (e) {
-      notify('Не удалось загрузить', e instanceof Error ? e.message : String(e));
-    } finally {
-      setLoadingMore(false);
-    }
-  };
-
   const messages = useMemo(() => data?.messages ?? [], [data]);
+  const conversation = workspace.conversations.find((chat) => chat.id === id) ?? data?.conversation;
   const approvals = useMemo(() => new Map((data?.pendingApprovals ?? []).map((a) => [a.id, a])), [data]);
   const running = data?.running ?? false;
   const blocked = (data?.pendingApprovals.length ?? 0) > 0;
-  const canSend = (!!text.trim() || picks.length > 0) && !sending && !running && !blocked;
-  const room = MAX_PICKS - picks.length;
-  // Подряд идущие вызовы инструментов сворачиваем в одну строку; запросы на подтверждение остаются отдельными карточками.
-  const rows = useMemo(() => {
-    const out: Row[] = [];
-    for (const m of messages) {
-      const groupable = m.role === 'tool' && !(m.status === 'pending' && m.approvalId && approvals.has(m.approvalId));
-      const last = out[out.length - 1];
-      if (groupable && last?.tools) last.tools.push(m);
-      else out.push(groupable ? { id: m.id, first: m, tools: [m] } : { id: m.id, first: m });
-    }
-    return out;
-  }, [messages, approvals]);
-  const needsLogin = main && !!status.data && !status.data.providers.some((p) => p.available);
-  const speechOk =
-    Platform.OS === 'web' &&
-    typeof window !== 'undefined' &&
-    ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window);
-
-  // Поиск по ленте с небольшой задержкой после ввода
-  useEffect(() => {
-    const q = query.trim();
-    if (!searchOpen || q.length < 2) return;
-    const t = setTimeout(() => {
-      api
-        .searchConversation(id, q)
-        .then((r) => setHits(r.results))
-        .catch(() => setHits([]));
-    }, 300);
-    return () => clearTimeout(t);
-  }, [query, searchOpen, id]);
-  const shownHits = query.trim().length >= 2 ? hits : [];
-
-  const openHit = async (h: SearchHit) => {
-    setSearchOpen(false);
-    atBottom.current = false; // идём к найденному месту, а не к концу
-    try {
-      const d = await api.conversation(id, { limit: PAGE, before: h.seq + 25 });
-      for (const m of d.messages) store.current.set(m.id, m);
-      await refresh();
-      setJump(h.seq);
-    } catch (e) {
-      notify('Не удалось открыть', e instanceof Error ? e.message : String(e));
-    }
-  };
-
-  const regenerate = async () => {
-    try {
-      store.current.clear();
-      await api.regenerate(id);
-      await refresh();
-    } catch (e) {
-      notify('Не удалось повторить', e instanceof Error ? e.message : String(e));
-      await refresh();
-    }
-  };
-
-  const editLast = async () => {
-    try {
-      const r = await api.rewind(id);
-      store.current.clear();
-      setText(r.content);
-      await refresh();
-    } catch (e) {
-      notify('Не удалось изменить', e instanceof Error ? e.message : String(e));
-    }
-  };
-
-  /** Диктовка голосом (веб: распознавание речи браузера). */
-  const toggleMic = () => {
-    if (listening) {
-      recRef.current?.stop();
-      return;
-    }
-    const w = window as unknown as { SpeechRecognition?: new () => SpeechRec; webkitSpeechRecognition?: new () => SpeechRec };
-    const Ctor = w.SpeechRecognition ?? w.webkitSpeechRecognition;
-    if (!Ctor) return;
-    const rec = new Ctor();
-    rec.lang = 'ru-RU';
-    rec.interimResults = true;
-    rec.continuous = false;
-    const base = text;
-    rec.onresult = (e) => {
-      let t = '';
-      for (let i = 0; i < e.results.length; i++) t += e.results[i]![0]!.transcript;
-      setText((base ? `${base} ` : '') + t);
-    };
-    rec.onend = () => setListening(false);
-    rec.onerror = () => setListening(false);
-    recRef.current = rec;
-    rec.start();
-    setListening(true);
-  };
-
-  // «Поделиться» в Polaris из другого приложения (PWA): текст попадает в поле ввода
-  useEffect(() => {
-    if (!main || Platform.OS !== 'web') return;
-    try {
-      const shared = sessionStorage.getItem('polaris.share');
-      if (shared) {
-        sessionStorage.removeItem('polaris.share');
-        setTimeout(() => setText(shared), 0);
-      }
-    } catch {
-      /* хранилище недоступно */
-    }
-  }, [main]);
-
-  // Переход к найденному сообщению
-  useEffect(() => {
-    if (jump === null) return;
-    const idx = rows.findIndex((r) => r.first.seq === jump || r.tools?.some((t) => t.seq === jump));
-    if (idx < 0) return;
-    const t = setTimeout(() => {
-      list.current?.scrollToIndex({ index: idx, viewPosition: 0.3, animated: true });
-      setJump(null);
-    }, 150);
-    return () => clearTimeout(t);
-  }, [jump, rows]);
-
-  const addPicks = async (get: () => Promise<Picked[]>) => {
-    try {
-      const got = await get();
-      if (got.length) setPicks((p) => [...p, ...got].slice(0, MAX_PICKS));
-    } catch (e) {
-      notify('Не удалось добавить фото', e instanceof Error ? e.message : String(e));
-    }
-  };
-
-  // Вставка картинки из буфера обмена (веб): Ctrl+V со скриншотом или скопированным фото.
-  useEffect(() => {
-    if (Platform.OS !== 'web') return;
-    const onPaste = (e: ClipboardEvent) => {
-      const files = [...(e.clipboardData?.files ?? [])].filter((f) => f.type.startsWith('image/'));
-      if (!files.length) return;
-      e.preventDefault();
-      void addPicks(() => picksFromFiles(files, MAX_PICKS - picksRef.current.length));
-    };
-    document.addEventListener('paste', onPaste);
-    return () => document.removeEventListener('paste', onPaste);
-  }, []);
+  const empty = !messages.length && !loading && !error;
+  const needsLogin = !!status.data && !status.data.providers.some((provider) => provider.available);
   const liveText = useSmoothText(running ? (data?.live ?? '') : '');
+  const rows = useMemo(() => {
+    const result: Row[] = [];
+    for (const message of messages) {
+      const groupable =
+        message.role === 'tool' &&
+        !(message.status === 'pending' && message.approvalId && approvals.has(message.approvalId));
+      const last = result[result.length - 1];
+      if (groupable && last?.tools) last.tools.push(message);
+      else
+        result.push(
+          groupable ? { id: message.id, first: message, tools: [message] } : { id: message.id, first: message },
+        );
+    }
+    return result;
+  }, [messages, approvals]);
 
-  const stop = async () => {
-    try {
-      await api.stopConversation(id);
-      await refresh();
-    } catch (e) {
-      notify('Не удалось остановить', e instanceof Error ? e.message : String(e));
+  const toEnd = (animated: boolean) => {
+    list.current?.scrollToEnd({ animated });
+    if (Platform.OS === 'web') {
+      const node = (
+        list.current as unknown as { getScrollableNode?: () => HTMLElement | null } | null
+      )?.getScrollableNode?.();
+      if (node) node.scrollTop = node.scrollHeight;
     }
   };
-
-  // Что агент делает прямо сейчас — по последнему вызову инструмента.
-  let doing = 'Думаю';
-  for (let i = messages.length - 1; i >= 0; i--) {
-    const m = messages[i]!;
-    if (m.role === 'assistant' && m.toolCalls?.length) {
-      doing = toolLabel(m.toolCalls[m.toolCalls.length - 1]!.name);
-      break;
-    }
-    if (m.role === 'user') break;
-  }
-
-  let lastUserId = '';
-  let lastAssistantId = '';
-  for (let i = messages.length - 1; i >= 0 && !lastUserId; i--) {
-    const m = messages[i]!;
-    if (m.role === 'user') lastUserId = m.id;
-    else if (m.role === 'assistant' && m.content && !lastAssistantId) lastAssistantId = m.id;
-  }
-  const lastId = messages.length ? messages[messages.length - 1]!.id : '';
+  const lastId = messages.at(-1)?.id;
   useEffect(() => {
-    if (lastId !== lastCount.current) {
-      lastCount.current = lastId;
-      if (atBottom.current) setTimeout(() => toEnd(true), 60);
+    if (lastId && atBottom.current) {
+      const timer = setTimeout(() => toEnd(true), 60);
+      return () => clearTimeout(timer);
     }
   }, [lastId]);
-
-  // После первой загрузки несколько раз подтверждаем «конец ленты»: разметка, формулы и картинки доезжают с задержкой.
-  const settled = useRef(false);
   const hasMessages = messages.length > 0;
   useEffect(() => {
     if (!hasMessages || settled.current) return;
@@ -579,364 +405,422 @@ export function ChatView({ id, main = false }: { id: string; main?: boolean }) {
     );
     timers.push(
       setTimeout(() => {
-        initialising.current = false; // дальше положение ленты определяет сам пользователь
+        initialising.current = false;
       }, 1100),
     );
     return () => timers.forEach(clearTimeout);
   }, [hasMessages]);
-
   useEffect(() => {
     if (liveText && atBottom.current) toEnd(false);
   }, [liveText]);
 
-  const send = async (override?: string) => {
-    const content = (override ?? text).trim();
-    const files = override ? [] : picks;
-    if ((!content && files.length === 0) || sending || running || blocked) return;
-    setSending(true);
-    atBottom.current = true; // после отправки показываем конец ленты
-    setText('');
-    setPicks([]);
+  const loadEarlier = async () => {
+    if (!id || loadingMore || !store.current.size) return;
+    setLoadingMore(true);
     try {
-      const ids: string[] = [];
-      for (const f of files) ids.push((await api.uploadAttachment({ name: f.name, mime: f.mime, data: f.data })).attachment.id);
-      await api.sendMessage(id, content, ids);
+      const first = Math.min(...[...store.current.values()].map((m) => m.seq));
+      const result = await api.conversation(id, { limit: PAGE, before: first });
+      for (const message of result.messages) store.current.set(message.id, message);
+      if (result.messages.length < PAGE) setExhausted(true);
       await refresh();
     } catch (e) {
-      setText(content);
-      setPicks(files);
-      notify('Не отправлено', e instanceof Error ? e.message : String(e));
+      setActionError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setLoadingMore(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!id || !searchOpen || query.trim().length < 2) return;
+    let active = true;
+    const timer = setTimeout(() => {
+      api
+        .searchConversation(id, query.trim())
+        .then((result) => {
+          if (active) setHits({ query: query.trim(), items: result.results });
+        })
+        .catch(() => {
+          if (active) setHits({ query: query.trim(), items: [] });
+        });
+    }, 250);
+    return () => {
+      active = false;
+      clearTimeout(timer);
+    };
+  }, [id, searchOpen, query]);
+  const openHit = async (hit: SearchHit) => {
+    if (!id) return;
+    setSearchOpen(false);
+    atBottom.current = false;
+    try {
+      const result = await api.conversation(id, { limit: PAGE, before: hit.seq + 25 });
+      for (const message of result.messages) store.current.set(message.id, message);
+      await refresh();
+      setJump(hit.seq);
+    } catch (e) {
+      setActionError(e instanceof Error ? e.message : String(e));
+    }
+  };
+  useEffect(() => {
+    if (jump === null) return;
+    const index = rows.findIndex((row) => row.first.seq === jump || row.tools?.some((tool) => tool.seq === jump));
+    if (index < 0) return;
+    const timer = setTimeout(() => {
+      list.current?.scrollToIndex({ index, viewPosition: 0.3, animated: true });
+      setJump(null);
+    }, 150);
+    return () => clearTimeout(timer);
+  }, [jump, rows]);
+
+  const regenerate = async () => {
+    if (!id) return;
+    try {
+      await api.regenerate(id);
+      store.current.clear();
+      await refresh();
+    } catch (e) {
+      setActionError(e instanceof Error ? e.message : String(e));
+    }
+  };
+  const editLast = async () => {
+    if (!id) return;
+    try {
+      const result = await api.rewind(id);
+      store.current.clear();
+      await refresh();
+      composer.current?.setText(result.content);
+    } catch (e) {
+      setActionError(e instanceof Error ? e.message : String(e));
+    }
+  };
+  const stop = async () => {
+    if (!id) return;
+    try {
+      await api.stopConversation(id);
+      await refresh();
+    } catch (e) {
+      setActionError(e instanceof Error ? e.message : String(e));
+    }
+  };
+  const send = async (content: string, files: Picked[]) => {
+    setSending(true);
+    setActionError(null);
+    atBottom.current = true;
+    try {
+      const attachmentIds: string[] = [];
+      for (const file of files) {
+        let attachmentId = uploaded.current.get(file.key);
+        if (!attachmentId) {
+          attachmentId = (await api.uploadAttachment({ name: file.name, mime: file.mime, data: file.data })).attachment
+            .id;
+          uploaded.current.set(file.key, attachmentId);
+        }
+        attachmentIds.push(attachmentId);
+      }
+      const target = id ?? (await api.createConversation()).conversation.id;
+      if (!id) setId(target);
+      await api.sendMessage(target, content, attachmentIds);
+      uploaded.current.clear();
+      void workspace.refreshChats();
+      if (!initialId) router.replace(`/chat/${target}`);
+      else await refresh();
     } finally {
       setSending(false);
     }
   };
-
   const onResolved = () => {
     void refresh();
     void refreshStatus();
   };
+  let doing = 'Думаю';
+  for (let index = messages.length - 1; index >= 0; index--) {
+    const message = messages[index]!;
+    if (message.role === 'assistant' && message.toolCalls?.length) {
+      doing = toolLabel(message.toolCalls.at(-1)!.name);
+      break;
+    }
+    if (message.role === 'user') break;
+  }
+  let lastUserId = '';
+  let lastAssistantId = '';
+  for (let index = messages.length - 1; index >= 0 && !lastUserId; index--) {
+    const message = messages[index]!;
+    if (message.role === 'user') lastUserId = message.id;
+    else if (message.role === 'assistant' && message.content && !lastAssistantId) lastAssistantId = message.id;
+  }
+  const composerView = (
+    <ChatComposer
+      ref={composer}
+      onSend={send}
+      running={running}
+      blocked={blocked}
+      onStop={() => void stop()}
+      draft={!initialId}
+    />
+  );
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }} edges={main ? ['left', 'right'] : ['bottom', 'left', 'right']}>
-      {main ? (
-        <Header
-          title="Polaris"
-          subtitle={running ? `${doing}…` : 'Ваш личный агент'}
-          actions={[
-            { icon: 'search-outline', label: 'Поиск по разговору', onPress: () => setSearchOpen(true) },
-            { icon: 'notifications-outline', label: 'Уведомления', badge: unread, onPress: () => router.push('/inbox') },
-            { icon: 'settings-outline', label: 'Ещё', onPress: () => router.push('/more') },
-          ]}
-        />
-      ) : (
-        <Stack.Screen options={{ title: data?.conversation.title ?? 'Чат' }} />
-      )}
+    <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }} edges={['bottom', 'left', 'right']}>
+      <View
+        style={{
+          paddingTop: insets.top + 10,
+          paddingBottom: 10,
+          paddingHorizontal: 18,
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 8,
+        }}
+      >
+        {!workspace.sidebarVisible ? (
+          <IconButton icon="menu-outline" label="Открыть меню" onPress={workspace.toggleSidebar} />
+        ) : null}
+        <Text style={{ color: colors.text, fontSize: 19, fontWeight: '600', letterSpacing: -0.5 }}>Polaris</Text>
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <Text
+            numberOfLines={1}
+            style={{ color: colors.muted, fontSize: 12, textAlign: 'center', paddingHorizontal: 12 }}
+          >
+            {conversation?.title ?? ''}
+          </Text>
+        </View>
+        {id ? <IconButton icon="search-outline" label="Поиск в чате" onPress={() => setSearchOpen(true)} /> : null}
+        {conversation ? (
+          <IconButton
+            icon="ellipsis-horizontal"
+            label="Действия с текущим чатом"
+            onPress={() => workspace.showChatMenu(conversation)}
+          />
+        ) : null}
+        <IconButton icon="create-outline" label="Новый чат" onPress={workspace.newChat} />
+      </View>
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        keyboardVerticalOffset={main ? insets.top + 72 : 90}
+        keyboardVerticalOffset={insets.top + 62}
       >
-        {loading && !data ? <Loading /> : null}
-        <ErrorNote message={error} onRetry={refresh} />
+        <ErrorNote message={error ?? actionError} onRetry={refresh} />
         {needsLogin ? (
-          <FadeIn style={{ marginHorizontal: space.lg, marginBottom: space.sm, ...WIDE, width: undefined }}>
-            <View style={{ backgroundColor: colors.warnBg, borderRadius: radius.md, padding: space.lg }}>
-              <Text style={{ color: colors.text, fontSize: 15, fontWeight: '600', marginBottom: 4 }}>Осталось подключить ChatGPT</Text>
-              <Text style={{ color: colors.muted, fontSize: 14, lineHeight: 20, marginBottom: space.md }}>
-                Polaris отвечает через вашу подписку ChatGPT. Вход занимает минуту: откроете ссылку, войдёте и вставите адрес из браузера.
-              </Text>
-              <Button title="Подключить" icon="log-in-outline" onPress={() => router.push('/settings')} />
-            </View>
-          </FadeIn>
-        ) : null}
-        <FlatList
-          ref={list}
-          data={rows}
-          keyExtractor={(r) => r.id}
-          style={{ width: '100%' }}
-          scrollEventThrottle={64}
-          onLayout={() => {
-            if (atBottom.current) toEnd(false); // высота списка изменилась (баннер, клавиатура)
-          }}
-          onScroll={(e) => {
-            if (initialising.current) return;
-            const { contentOffset, contentSize, layoutMeasurement } = e.nativeEvent;
-            atBottom.current = contentSize.height - layoutMeasurement.height - contentOffset.y < 160;
-          }}
-          // Контент ленты (разметка, формулы, картинки) дорисовывается после первого кадра: пока читаем конец, держим его на экране.
-          // Так после перезапуска приложения лента открывается внизу, а не прыгает к началу.
-          onContentSizeChange={() => {
-            if (atBottom.current) toEnd(false);
-          }}
-          // Рендерим сразу всю загруженную страницу: иначе высота ленты оценивается приблизительно и «конец» оказывается не там.
-          initialNumToRender={PAGE + 20}
-          windowSize={31}
-          maxToRenderPerBatch={PAGE}
-          onScrollToIndexFailed={(info) => {
-            list.current?.scrollToOffset({ offset: info.averageItemLength * info.index, animated: true });
-            setTimeout(() => list.current?.scrollToIndex({ index: info.index, viewPosition: 0.3, animated: true }), 400);
-          }}
-          ListHeaderComponent={
-            !exhausted && messages.length >= PAGE ? (
-              <PressScale onPress={loadEarlier} style={{ alignSelf: 'center', paddingVertical: 8, paddingHorizontal: 16, marginBottom: space.sm }}>
-                <Text style={{ color: colors.accent, fontSize: 14 }}>{loadingMore ? 'Загружаю…' : 'Показать ранее'}</Text>
-              </PressScale>
-            ) : undefined
-          }
-          contentContainerStyle={{
-            ...WIDE,
-            paddingHorizontal: space.lg,
-            paddingTop: space.md,
-            paddingBottom: space.lg,
-            flexGrow: 1,
-          }}
-          ListEmptyComponent={
-            !loading ? (
-              <FadeIn style={{ flex: 1, justifyContent: 'center', paddingBottom: space.xl * 2 }}>
-                <Text style={{ color: colors.accent, fontSize: 26, marginBottom: space.sm }}>✦</Text>
-                <Text style={{ color: colors.text, fontSize: 30, fontFamily: fonts.serif, fontWeight: '400', letterSpacing: -0.6 }}>
-                  {main ? 'Я рядом. С чего начнём?' : 'Чем займёмся?'}
-                </Text>
-                <Text style={{ color: colors.muted, fontSize: 15, lineHeight: 22, marginTop: 6, marginBottom: space.xl }}>
-                  Поиск, заметки, память и фоновые задачи — просто напишите.
-                </Text>
-                {SUGGESTIONS.map((q, i) => (
-                  <FadeIn key={q} delay={120 + i * 70}>
-                    <PressScale
-                      onPress={() => void send(q)}
-                      style={{
-                        borderRadius: radius.md,
-                        borderWidth: 1,
-                        borderColor: colors.border,
-                        backgroundColor: colors.surface,
-                        paddingVertical: 13,
-                        paddingHorizontal: space.lg,
-                        marginBottom: space.sm,
-                      }}
-                    >
-                      <Text style={{ color: colors.text, fontSize: 15 }}>{q}</Text>
-                    </PressScale>
-                  </FadeIn>
-                ))}
-              </FadeIn>
-            ) : undefined
-          }
-          renderItem={({ item: row, index }) => {
-            const item = row.first;
-            const prev = rows[index - 1]?.first;
-            const chip = !prev || dayKey(prev.createdAt) !== dayKey(item.createdAt) ? <DayChip iso={item.createdAt} /> : null;
-            return (
-              <>
-                {chip}
-                {row.tools ? (
-                  <ToolGroup items={row.tools} />
-                ) : item.role === 'tool' ? (
-                  <ToolRow
-                    m={item}
-                    approval={item.approvalId ? approvals.get(item.approvalId) : undefined}
-                    onResolved={onResolved}
-                  />
-                ) : item.role === 'system' ? (
-                  item.toolName === 'compaction' ? <CompactionNote /> : null
-                ) : (
-                  <Bubble
-                    m={item}
-                    onOpen={setViewing}
-                    isLast={item.id === lastAssistantId}
-                    onRegenerate={item.id === lastAssistantId && !running && !blocked && item.provider === 'chatgpt' ? regenerate : undefined}
-                    onEdit={item.id === lastUserId && !running && !blocked ? editLast : undefined}
-                  />
-                )}
-              </>
-            );
-          }}
-          ListFooterComponent={
-            running ? (
-              <View style={{ paddingVertical: space.sm }}>
-                {liveText ? <Markdown text={liveText} /> : null}
-                <FadeIn distance={4} style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: space.sm }}>
-                  <TypingDots />
-                  {liveText ? null : (
-                    <Text style={{ color: colors.muted, marginLeft: space.sm, fontSize: 14 }}>{doing}…</Text>
-                  )}
-                </FadeIn>
-              </View>
-            ) : undefined
-          }
-        />
-        {blocked ? (
-          <Text
-            style={{ color: colors.warn, textAlign: 'center', paddingHorizontal: space.lg, paddingBottom: 6, fontSize: 13 }}
-          >
-            Ждёт вашего решения — одобрите или отклоните действие выше.
-          </Text>
-        ) : null}
-        <View style={[{ paddingHorizontal: space.md, paddingBottom: keyboardOpen ? 6 : space.xs, paddingTop: 4 }, WIDE]}>
-          {picks.length ? (
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 4, paddingBottom: space.sm }}>
-              {picks.map((pk) => (
-                <FadeIn key={pk.key} distance={4} style={{ marginRight: space.sm, marginBottom: 4 }}>
-                  <Image source={{ uri: previewUri(pk) }} style={{ width: 64, height: 64, borderRadius: radius.sm }} />
-                  <Pressable
-                    accessibilityLabel="Убрать фото"
-                    hitSlop={6}
-                    onPress={() => setPicks((all) => all.filter((x) => x.key !== pk.key))}
-                    style={{
-                      position: 'absolute',
-                      top: -6,
-                      right: -6,
-                      width: 20,
-                      height: 20,
-                      borderRadius: 10,
-                      backgroundColor: colors.ink,
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                    }}
-                  >
-                    <Ionicons name="close" size={13} color={colors.accentText} />
-                  </Pressable>
-                </FadeIn>
-              ))}
-            </View>
-          ) : null}
           <View
-            style={[
-              {
-                flexDirection: 'row',
-                alignItems: 'flex-end',
-                backgroundColor: colors.surface,
-                borderRadius: 26,
-                borderWidth: 1,
-                borderColor: colors.border,
-                paddingLeft: 6,
-                paddingRight: 6,
-                paddingVertical: 6,
-              },
-              shadow,
-            ]}
-          >
-            <Pressable
-              accessibilityLabel="Прикрепить фото"
-              disabled={room <= 0 || blocked}
-              onPress={() => void addPicks(() => pickImages(room))}
-              style={{
-                width: 38,
-                height: 38,
-                borderRadius: 19,
-                alignItems: 'center',
-                justifyContent: 'center',
-                opacity: room <= 0 || blocked ? 0.35 : 1,
-              }}
-            >
-              <Ionicons name="image-outline" size={22} color={colors.muted} />
-            </Pressable>
-            <TextInput
-              value={text}
-              onChangeText={setText}
-              placeholder="Сообщение Polaris"
-              autoComplete="off"
-              textContentType="none"
-              importantForAutofill="no"
-              autoCapitalize="sentences"
-              placeholderTextColor={colors.muted}
-              multiline
-              numberOfLines={1}
-              editable={!blocked}
-              onKeyPress={(e) => {
-                const ev = e.nativeEvent as unknown as { key: string; shiftKey?: boolean };
-                if (Platform.OS === 'web' && ev.key === 'Enter' && !ev.shiftKey) {
-                  (e as unknown as { preventDefault?: () => void }).preventDefault?.();
-                  void send();
-                }
-              }}
-              style={[
-                {
-                  flex: 1,
-                  maxHeight: 140,
-                  color: colors.text,
-                  paddingTop: 9,
-                  paddingBottom: 9,
-                  paddingLeft: 4,
-                  paddingRight: space.sm,
-                  fontSize: 16,
-                },
-                Platform.OS === 'web' ? ({ outlineStyle: 'none' } as object) : null,
-              ]}
-            />
-            {speechOk && !running ? (
-              <Pressable
-                onPress={toggleMic}
-                accessibilityLabel={listening ? 'Остановить диктовку' : 'Диктовать голосом'}
-                style={{
-                  width: 38,
-                  height: 38,
-                  borderRadius: 19,
-                  marginRight: 2,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  backgroundColor: listening ? colors.accent : 'transparent',
-                }}
-              >
-                <Ionicons name={listening ? 'stop' : 'mic-outline'} size={20} color={listening ? colors.accentText : colors.muted} />
-              </Pressable>
-            ) : null}
-            <SendButton enabled={canSend} running={running} onPress={() => (running ? void stop() : void send())} />
-          </View>
-        </View>
-      </KeyboardAvoidingView>
-      <Modal visible={searchOpen} transparent animationType="fade" onRequestClose={() => setSearchOpen(false)}>
-        <Pressable onPress={() => setSearchOpen(false)} style={{ flex: 1, backgroundColor: 'rgba(43,38,32,0.35)', alignItems: 'center' }}>
-          <Pressable
-            onPress={() => undefined}
             style={{
-              width: '100%',
-              maxWidth: 560,
-              marginTop: insets.top + 56,
-              marginHorizontal: space.lg,
-              backgroundColor: colors.surface,
-              borderRadius: radius.lg,
-              padding: space.md,
-              maxHeight: '70%',
+              ...WIDE,
+              paddingHorizontal: 20,
+              paddingVertical: 8,
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 10,
             }}
           >
-            <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surface2, borderRadius: 22, paddingHorizontal: 14 }}>
-              <Ionicons name="search" size={16} color={colors.muted} />
-              <TextInput
-                value={query}
-                onChangeText={setQuery}
-                autoFocus
-                placeholder="Искать в разговоре"
-                placeholderTextColor={colors.muted}
-                style={[{ flex: 1, color: colors.text, fontSize: 15, paddingVertical: 11, paddingHorizontal: 8 }, { outlineStyle: 'none' } as object]}
-              />
-            </View>
+            <Ionicons name="sparkles-outline" size={16} color={colors.accent} />
+            <Text style={{ flex: 1, fontSize: 12, color: colors.muted, lineHeight: 18 }}>
+              Подключите ChatGPT, чтобы начать разговор.
+            </Text>
+            <Pressable accessibilityRole="button" onPress={() => router.push('/settings')} style={{ padding: 8 }}>
+              <Text style={{ color: colors.accent, fontSize: 12, fontWeight: '600' }}>Подключить</Text>
+            </Pressable>
+          </View>
+        ) : null}
+        {empty ? (
+          <View style={{ flex: 1, justifyContent: 'center', paddingBottom: keyboardOpen ? 0 : 72 }}>
+            <FadeIn style={{ alignItems: 'center', paddingHorizontal: 24, marginBottom: 23 }}>
+              <Text style={{ color: colors.accent, fontSize: 47, marginBottom: 20 }}>✦</Text>
+              <Text
+                style={{
+                  color: colors.text,
+                  fontFamily: fonts.serif,
+                  fontSize: 36,
+                  letterSpacing: -1,
+                  textAlign: 'center',
+                }}
+              >
+                О чём поговорим?
+              </Text>
+              <Text style={{ color: colors.muted, fontSize: 14, lineHeight: 22, marginTop: 10, textAlign: 'center' }}>
+                Для больших идей и повседневных дел.
+              </Text>
+            </FadeIn>
+            {composerView}
+            {!keyboardOpen ? (
+              <View
+                style={{
+                  ...WIDE,
+                  flexDirection: 'row',
+                  justifyContent: 'center',
+                  flexWrap: 'wrap',
+                  gap: 8,
+                  paddingHorizontal: 24,
+                  paddingTop: 15,
+                }}
+              >
+                {SUGGESTIONS.map((suggestion) => (
+                  <Pressable
+                    key={suggestion.label}
+                    accessibilityRole="button"
+                    onPress={() => composer.current?.setText(suggestion.prompt)}
+                    style={({ hovered }: HoverState) => ({
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: 7,
+                      borderWidth: 1,
+                      borderColor: colors.border,
+                      borderRadius: 20,
+                      paddingHorizontal: 13,
+                      paddingVertical: 9,
+                      backgroundColor: hovered ? colors.surface2 : 'transparent',
+                    })}
+                  >
+                    <Ionicons name={suggestion.icon} size={15} color={colors.accent} />
+                    <Text style={{ fontSize: 12, color: colors.muted }}>{suggestion.label}</Text>
+                  </Pressable>
+                ))}
+              </View>
+            ) : null}
+          </View>
+        ) : (
+          <>
+            {loading && !data ? <Loading /> : null}
             <FlatList
-              data={shownHits}
-              keyExtractor={(h) => h.id}
-              keyboardShouldPersistTaps="handled"
-              ListEmptyComponent={
-                <Text style={{ color: colors.muted, fontSize: 14, textAlign: 'center', padding: space.lg }}>
-                  {query.trim().length < 2 ? 'Введите хотя бы два символа' : 'Ничего не найдено'}
-                </Text>
+              ref={list}
+              data={rows}
+              keyExtractor={(row) => row.id}
+              style={{ flex: 1, width: '100%' }}
+              scrollEventThrottle={64}
+              onLayout={() => {
+                if (atBottom.current) toEnd(false);
+              }}
+              onScroll={(event) => {
+                if (initialising.current) return;
+                const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent;
+                atBottom.current = contentSize.height - layoutMeasurement.height - contentOffset.y < 140;
+              }}
+              onContentSizeChange={() => {
+                if (atBottom.current) toEnd(false);
+              }}
+              initialNumToRender={PAGE + 20}
+              windowSize={31}
+              maxToRenderPerBatch={PAGE}
+              onScrollToIndexFailed={(info) =>
+                list.current?.scrollToOffset({ offset: info.averageItemLength * info.index, animated: true })
               }
-              renderItem={({ item: h }) => (
-                <PressScale onPress={() => void openHit(h)} scale={0.985} style={{ paddingVertical: 10, paddingHorizontal: 6 }}>
-                  <Text style={{ color: colors.muted, fontSize: 12, marginBottom: 2 }}>
-                    {h.role === 'user' ? 'Вы' : 'Polaris'} · {new Date(h.createdAt).toLocaleString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
-                  </Text>
-                  <Text style={{ color: colors.text, fontSize: 14, lineHeight: 20 }} numberOfLines={3}>
-                    {h.snippet}
-                  </Text>
-                </PressScale>
-              )}
+              contentContainerStyle={{ ...WIDE, paddingHorizontal: 24, paddingTop: 16, paddingBottom: 30, flexGrow: 1 }}
+              ListHeaderComponent={
+                !exhausted && messages.length >= PAGE ? (
+                  <PressScale onPress={loadEarlier} style={{ alignSelf: 'center', padding: 12 }}>
+                    <Text style={{ color: colors.accent, fontSize: 13 }}>
+                      {loadingMore ? 'Загружаю…' : 'Показать предыдущие сообщения'}
+                    </Text>
+                  </PressScale>
+                ) : undefined
+              }
+              renderItem={({ item: row, index }) => {
+                const item = row.first;
+                const prev = rows[index - 1]?.first;
+                return (
+                  <>
+                    {!prev || dayKey(prev.createdAt) !== dayKey(item.createdAt) ? (
+                      <DayChip iso={item.createdAt} />
+                    ) : null}
+                    {row.tools ? (
+                      <ToolGroup items={row.tools} />
+                    ) : item.role === 'tool' ? (
+                      <ToolRow
+                        m={item}
+                        approval={item.approvalId ? approvals.get(item.approvalId) : undefined}
+                        onResolved={onResolved}
+                      />
+                    ) : item.role === 'system' ? (
+                      item.toolName === 'compaction' ? (
+                        <CompactionNote />
+                      ) : null
+                    ) : (
+                      <Bubble
+                        m={item}
+                        onOpen={setViewing}
+                        isLast={item.id === lastAssistantId}
+                        onRegenerate={
+                          item.id === lastAssistantId && !running && !blocked && !sending ? regenerate : undefined
+                        }
+                        onEdit={item.id === lastUserId && !running && !blocked && !sending ? editLast : undefined}
+                      />
+                    )}
+                  </>
+                );
+              }}
+              ListFooterComponent={
+                running ? (
+                  <View style={{ paddingVertical: space.sm }}>
+                    {liveText ? <Markdown text={liveText} /> : null}
+                    <View style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: space.sm }}>
+                      <TypingDots />
+                      {!liveText ? (
+                        <Text style={{ color: colors.muted, fontSize: 13, marginLeft: 10 }}>{doing}…</Text>
+                      ) : null}
+                    </View>
+                  </View>
+                ) : undefined
+              }
             />
-          </Pressable>
-        </Pressable>
-      </Modal>
+            {blocked ? (
+              <Text style={{ color: colors.warn, textAlign: 'center', paddingHorizontal: 20, fontSize: 12 }}>
+                Одобрите или отклоните действие выше, чтобы продолжить.
+              </Text>
+            ) : null}
+            {composerView}
+          </>
+        )}
+      </KeyboardAvoidingView>
+      <Dialog visible={searchOpen} title="Поиск в чате" onClose={() => setSearchOpen(false)}>
+        <TextInput
+          accessibilityLabel="Искать в разговоре"
+          value={query}
+          onChangeText={setQuery}
+          autoFocus
+          placeholder="Введите хотя бы два символа"
+          placeholderTextColor={colors.muted}
+          style={[
+            {
+              backgroundColor: colors.surface2,
+              color: colors.text,
+              borderRadius: 10,
+              padding: 12,
+              fontSize: 14,
+              marginBottom: 12,
+            },
+            Platform.OS === 'web' && ({ outlineStyle: 'none' } as object),
+          ]}
+        />
+        <FlatList
+          data={hits?.query === query.trim() ? hits.items : []}
+          keyExtractor={(hit) => hit.id}
+          keyboardShouldPersistTaps="handled"
+          style={{ maxHeight: 360 }}
+          ListEmptyComponent={
+            <Text style={{ color: colors.muted, fontSize: 13, paddingVertical: 16, textAlign: 'center' }}>
+              {query.trim().length < 2 ? 'Найдите сообщение в этом разговоре' : 'Ничего не найдено'}
+            </Text>
+          }
+          renderItem={({ item }) => (
+            <Pressable accessibilityRole="button" onPress={() => void openHit(item)} style={{ paddingVertical: 12 }}>
+              <Text style={{ color: colors.accent, fontSize: 11, marginBottom: 4 }}>
+                {item.role === 'user' ? 'Вы' : 'Polaris'} · {new Date(item.createdAt).toLocaleDateString('ru-RU')}
+              </Text>
+              <Text numberOfLines={3} style={{ color: colors.text, fontSize: 13, lineHeight: 20 }}>
+                {item.snippet}
+              </Text>
+            </Pressable>
+          )}
+        />
+      </Dialog>
       <Modal visible={!!viewing} transparent animationType="fade" onRequestClose={() => setViewing(null)}>
         <Pressable
+          accessibilityLabel="Закрыть фото"
           onPress={() => setViewing(null)}
-          style={{ flex: 1, backgroundColor: 'rgba(30,25,18,0.88)', alignItems: 'center', justifyContent: 'center', padding: space.lg }}
+          style={{
+            flex: 1,
+            backgroundColor: 'rgba(30,25,18,0.9)',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: 20,
+          }}
         >
           {viewing ? (
             <Image
@@ -946,6 +830,9 @@ export function ChatView({ id, main = false }: { id: string; main?: boolean }) {
               style={{ width: '100%', height: '100%' }}
             />
           ) : null}
+          <View style={{ position: 'absolute', top: insets.top + 16, right: 20, padding: 8 }}>
+            <Ionicons name="close" size={25} color={colors.accentText} />
+          </View>
         </Pressable>
       </Modal>
     </SafeAreaView>

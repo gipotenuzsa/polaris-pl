@@ -43,8 +43,10 @@ describe('фоновые задачи', () => {
     const notes = (await api('GET', '/api/notifications', h)).body.items as Json[];
     expect(notes[0]).toMatchObject({ kind: 'task_done', ref: { taskId: id } });
 
-    // диалог задачи не засоряет список чатов
-    expect((await api('GET', '/api/conversations', h)).body.conversations).toHaveLength(0);
+    // В истории виден общий разговор с результатом; внутренний контекст задачи остаётся отдельно.
+    expect((await api('GET', '/api/conversations', h)).body.conversations).toMatchObject([
+      { kind: 'chat', isMain: true },
+    ]);
     expect((await api('GET', '/api/conversations?kind=task', h)).body.conversations).toHaveLength(1);
     // бюджет считается и по фоновым задачам
     expect((await api('GET', '/api/budget', h)).body.daily.tokens).toBe(240);

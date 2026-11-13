@@ -653,8 +653,7 @@ describe('стриминг и остановка ответа', () => {
 
 describe('вложения-изображения', () => {
   // 1×1 PNG
-  const PNG =
-    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+  const PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
 
   const setup = async () => {
     env = await createTestEnv({ script: () => ({ content: 'вижу картинку' }) });
@@ -705,21 +704,24 @@ describe('вложения-изображения', () => {
     expect(first.statusCode).toBe(202);
     await env.ctx.runs.idle();
     const other = (await env.app.inject({ method: 'POST', url: '/api/conversations', headers: h, payload: {} })).json();
-    await env.app.inject({
+    const reused = await env.app.inject({
       method: 'POST',
       url: `/api/conversations/${other.conversation.id}/messages`,
       headers: h,
       payload: { content: 'привет', attachmentIds: [att.id] },
     });
+    expect(reused.statusCode).toBe(409);
     await env.ctx.runs.idle();
     const second = (await env.app.inject({ url: `/api/conversations/${other.conversation.id}`, headers: h })).json();
-    expect(second.messages[0].attachments).toBeUndefined();
+    expect(second.messages).toHaveLength(0);
   });
 
   it('отклоняет не-изображения, не-base64 и пустые сообщения; без входа доступа нет', async () => {
     const { h, id } = await setup();
     expect((await upload(h, { name: 'x.exe', mime: 'application/zip', data: PNG })).statusCode).toBe(400);
-    expect((await upload(h, { name: 'x.png', mime: 'image/png', data: '<script>alert(1)</script>' })).statusCode).toBe(400);
+    expect((await upload(h, { name: 'x.png', mime: 'image/png', data: '<script>alert(1)</script>' })).statusCode).toBe(
+      400,
+    );
     const empty = await env.app.inject({
       method: 'POST',
       url: `/api/conversations/${id}/messages`,
@@ -784,20 +786,22 @@ describe('единый разговор, сжатие контекста, ист
   const mainId = async (h: Record<string, string>) =>
     (await env.app.inject({ url: '/api/main', headers: h })).json().conversation.id as string;
 
-  it('главный разговор один, не попадает в список чатов; сообщения читаются страницами', async () => {
+  it('прежний главный разговор один и доступен в истории чатов; сообщения читаются страницами', async () => {
     env = await createTestEnv({ script: () => ({ content: 'ок' }) });
     const h = await login(env.app);
     const id = await mainId(h);
     expect(await mainId(h)).toBe(id);
     expect((await env.app.inject({ url: '/api/main', headers: h })).json().conversation.isMain).toBe(true);
     const list = (await env.app.inject({ url: '/api/conversations', headers: h })).json().conversations;
-    expect(list.find((c: { id: string }) => c.id === id)).toBeUndefined();
+    expect(list.find((c: { id: string }) => c.id === id)).toMatchObject({ id, isMain: true });
 
     for (const t of ['раз', 'два', 'три']) await sendTo(h, id, t); // 6 сообщений
     const page = (await env.app.inject({ url: `/api/conversations/${id}?limit=2`, headers: h })).json();
     expect(page.messages.map((m: { content: string }) => m.content)).toEqual(['три', 'ок']);
     const before = page.messages[0].seq as number;
-    const older = (await env.app.inject({ url: `/api/conversations/${id}?limit=2&before=${before}`, headers: h })).json();
+    const older = (
+      await env.app.inject({ url: `/api/conversations/${id}?limit=2&before=${before}`, headers: h })
+    ).json();
     expect(older.messages.map((m: { content: string }) => m.content)).toEqual(['два', 'ок']);
   });
 
@@ -805,7 +809,9 @@ describe('единый разговор, сжатие контекста, ист
     env = await createTestEnv({
       config: { AGENT_CONTEXT_TOKENS: '600' },
       script: (req) =>
-        req.messages[0]?.content.includes('сжимаешь') ? { content: 'СВОДКА: пользователя зовут Алия' } : { content: 'принято' },
+        req.messages[0]?.content.includes('сжимаешь')
+          ? { content: 'СВОДКА: пользователя зовут Алия' }
+          : { content: 'принято' },
     });
     const h = await login(env.app);
     const id = await mainId(h);
@@ -819,7 +825,11 @@ describe('единый разговор, сжатие контекста, ист
     expect(state.upto).toBeGreaterThan(0);
 
     const conv = (await env.app.inject({ url: `/api/conversations/${id}`, headers: h })).json();
-    expect(conv.messages.some((m: { role: string; toolName?: string }) => m.role === 'system' && m.toolName === 'compaction')).toBe(true);
+    expect(
+      conv.messages.some(
+        (m: { role: string; toolName?: string }) => m.role === 'system' && m.toolName === 'compaction',
+      ),
+    ).toBe(true);
 
     await sendTo(h, id, 'последний вопрос');
     const last = env.provider.calls.at(-1)!;
@@ -827,7 +837,9 @@ describe('единый разговор, сжатие контекста, ист
     const texts = last.messages.map((m) => m.content).join('\n');
     expect(texts).toContain('последний вопрос');
     expect(texts).not.toContain('сообщение 0'); // самое раннее уже в сводке
-    expect(last.messages.every((m) => !(m.role === 'system' && m.content.includes('Ранняя часть разговора')))).toBe(true);
+    expect(last.messages.every((m) => !(m.role === 'system' && m.content.includes('Ранняя часть разговора')))).toBe(
+      true,
+    );
   });
 
   it('history_search находит реплики, уже ушедшие в сводку', async () => {
@@ -848,7 +860,9 @@ describe('единый разговор, сжатие контекста, ист
     const msgs = (await env.app.inject({ url: `/api/conversations/${id}`, headers: h })).json().messages;
     const tool = msgs.find((m: { role: string }) => m.role === 'tool');
     expect(tool.content).toContain('тариф Лайт за 5 долларов');
-    const miss = await env.ctx.tools.get('history_search')!.execute({ query: 'никогда-не-было' }, { app: env.ctx, conversationId: id });
+    const miss = await env.ctx.tools
+      .get('history_search')!
+      .execute({ query: 'никогда-не-было' }, { app: env.ctx, conversationId: id });
     expect(miss.content).toContain('ничего не найдено');
   });
 
@@ -869,7 +883,9 @@ describe('единый разговор, сжатие контекста, ист
         const sys = req.messages[0]!.content;
         const last = req.messages.at(-1)!;
         if (sys.includes('субагент-исследователь')) {
-          return last.role === 'tool' ? { content: 'ВЫЖИМКА: главное за 3 пункта' } : { toolCalls: [toolCall('browser_read', { query: 'тема' }, 's1')] };
+          return last.role === 'tool'
+            ? { content: 'ВЫЖИМКА: главное за 3 пункта' }
+            : { toolCalls: [toolCall('browser_read', { query: 'тема' }, 's1')] };
         }
         if (last.role === 'tool') return { content: `итог: ${last.content}` };
         return { toolCalls: [toolCall('research', { question: 'Сравни три источника про тему' }, 'r1')] };
@@ -889,7 +905,12 @@ describe('единый разговор, сжатие контекста, ист
 
 describe('резервная копия, проверки, наблюдатели, повтор и поиск', () => {
   const sendTo = async (h: Record<string, string>, id: string, content: string) => {
-    const res = await env.app.inject({ method: 'POST', url: `/api/conversations/${id}/messages`, headers: h, payload: { content } });
+    const res = await env.app.inject({
+      method: 'POST',
+      url: `/api/conversations/${id}/messages`,
+      headers: h,
+      payload: { content },
+    });
     expect(res.statusCode).toBe(202);
     await env.ctx.runs.idle();
   };
@@ -911,7 +932,11 @@ describe('резервная копия, проверки, наблюдател�
         method: 'POST',
         url: '/api/attachments',
         headers: h,
-        payload: { name: 'a.png', mime: 'image/png', data: 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==' },
+        payload: {
+          name: 'a.png',
+          mime: 'image/png',
+          data: 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
+        },
       })
     ).json().attachment;
     await env.app.inject({
@@ -938,19 +963,35 @@ describe('резервная копия, проверки, наблюдател�
     const freshMain = await mainOf(h);
     expect(freshMain).not.toBe(id);
 
-    const bad = await env.app.inject({ method: 'POST', url: '/api/backup/restore', headers: h, payload: { replace: true, backup: { x: 1 } } });
+    const bad = await env.app.inject({
+      method: 'POST',
+      url: '/api/backup/restore',
+      headers: h,
+      payload: { replace: true, backup: { x: 1 } },
+    });
     expect(bad.statusCode).toBe(400);
-    const noConfirm = await env.app.inject({ method: 'POST', url: '/api/backup/restore', headers: h, payload: { backup: file } });
+    const noConfirm = await env.app.inject({
+      method: 'POST',
+      url: '/api/backup/restore',
+      headers: h,
+      payload: { backup: file },
+    });
     expect(noConfirm.statusCode).toBe(400);
 
-    const res = await env.app.inject({ method: 'POST', url: '/api/backup/restore', headers: h, payload: { replace: true, backup: file } });
+    const res = await env.app.inject({
+      method: 'POST',
+      url: '/api/backup/restore',
+      headers: h,
+      payload: { replace: true, backup: file },
+    });
     expect(res.statusCode).toBe(200);
     expect(res.json().counts.messages).toBe(4);
 
     expect(await mainOf(h)).toBe(id);
     const msgs = await thread(h, id);
     expect(msgs.map((m) => m.content)).toEqual(['первое', 'ответ', 'второе', 'ответ']);
-    const restored = (await env.app.inject({ url: `/api/conversations/${id}`, headers: h })).json().messages[0].attachments;
+    const restored = (await env.app.inject({ url: `/api/conversations/${id}`, headers: h })).json().messages[0]
+      .attachments;
     expect(restored).toHaveLength(1);
     const img = await env.app.inject({ url: `/api/attachments/${restored[0].id}`, headers: h });
     expect(img.headers['content-type']).toBe('image/png');
@@ -968,15 +1009,40 @@ describe('резервная копия, проверки, наблюдател�
       version: 1,
       createdAt: '2026-01-01T00:00:00.000Z',
       tables: {
-        conversations: [{ id: '11111111-1111-4111-8111-111111111111', title: 'Старый чат', kind: 'chat', created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-01T00:00:00Z' }],
-        messages: [{ id: '22222222-2222-4222-8222-222222222222', seq: 7, conversation_id: '11111111-1111-4111-8111-111111111111', role: 'user', content: 'привет', created_at: '2026-01-01T00:00:01Z', лишнее: 1 }],
+        conversations: [
+          {
+            id: '11111111-1111-4111-8111-111111111111',
+            title: 'Старый чат',
+            kind: 'chat',
+            created_at: '2026-01-01T00:00:00Z',
+            updated_at: '2026-01-01T00:00:00Z',
+          },
+        ],
+        messages: [
+          {
+            id: '22222222-2222-4222-8222-222222222222',
+            seq: 7,
+            conversation_id: '11111111-1111-4111-8111-111111111111',
+            role: 'user',
+            content: 'привет',
+            created_at: '2026-01-01T00:00:01Z',
+            лишнее: 1,
+          },
+        ],
       },
     };
-    const res = await env.app.inject({ method: 'POST', url: '/api/backup/restore', headers: h, payload: { replace: true, backup: old } });
+    const res = await env.app.inject({
+      method: 'POST',
+      url: '/api/backup/restore',
+      headers: h,
+      payload: { replace: true, backup: old },
+    });
     expect(res.statusCode).toBe(200);
     const list = (await env.app.inject({ url: '/api/conversations', headers: h })).json().conversations;
     expect(list[0]).toMatchObject({ title: 'Старый чат', pinned: false, isMain: false });
-    const conv = (await env.app.inject({ url: '/api/conversations/11111111-1111-4111-8111-111111111111', headers: h })).json();
+    const conv = (
+      await env.app.inject({ url: '/api/conversations/11111111-1111-4111-8111-111111111111', headers: h })
+    ).json();
     expect(conv.messages[0]).toMatchObject({ seq: 7, content: 'привет', status: 'ok' });
   });
 
@@ -1008,7 +1074,13 @@ describe('резервная копия, проверки, наблюдател�
     answer = 'Через час у вас встреча.';
     expect(await env.ctx.checkins.maybeRun(now)).toBe(true);
     await waitFor(async () => (await thread(h, id)).length > 0);
-    expect(await thread(h, id)).toEqual([expect.objectContaining({ role: 'assistant', content: '🔔 Через час у вас встреча.', provider: 'polaris-checkin' })]);
+    expect(await thread(h, id)).toEqual([
+      expect.objectContaining({
+        role: 'assistant',
+        content: '🔔 Через час у вас встреча.',
+        provider: 'polaris-checkin',
+      }),
+    ]);
     await waitFor(async () => !(env.ctx.checkins as unknown as { running: boolean }).running);
     const subs = (await env.app.inject({ url: '/api/conversations?kind=task', headers: h })).json().conversations;
     expect(subs).toHaveLength(0); // временный контекст проверки удалён
@@ -1024,7 +1096,9 @@ describe('резервная копия, проверки, наблюдател�
     const h = await login(env.app);
     const id = await mainOf(h);
     const run = async () => {
-      const t = (await env.app.inject({ method: 'POST', url: '/api/tasks', headers: h, payload: { goal: 'Следи за ценой' } })).json().item.id;
+      const t = (
+        await env.app.inject({ method: 'POST', url: '/api/tasks', headers: h, payload: { goal: 'Следи за ценой' } })
+      ).json().item.id;
       await waitFor(async () => (await env.ctx.tasks.get(t)).status === 'done');
     };
     await run();
@@ -1049,7 +1123,12 @@ describe('резервная копия, проверки, наблюдател�
     await env.ctx.runs.idle();
     expect((await thread(h, id)).map((m) => m.content)).toEqual(['расскажи про зелёный чай подробно', 'ответ 2']);
 
-    const found = (await env.app.inject({ url: `/api/conversations/${id}/search?q=${encodeURIComponent('ЗЕЛЁНЫЙ чай')}`, headers: h })).json().results;
+    const found = (
+      await env.app.inject({
+        url: `/api/conversations/${id}/search?q=${encodeURIComponent('ЗЕЛЁНЫЙ чай')}`,
+        headers: h,
+      })
+    ).json().results;
     expect(found).toHaveLength(1);
     expect(found[0].snippet).toContain('зелёный чай');
     const short = await env.app.inject({ url: `/api/conversations/${id}/search?q=a`, headers: h });
@@ -1075,7 +1154,12 @@ describe('резервная копия, проверки, наблюдател�
 describe('лимит шагов и неудачи инструментов', () => {
   const run = async (h: Record<string, string>, text: string) => {
     const id = (await env.app.inject({ url: '/api/main', headers: h })).json().conversation.id as string;
-    const res = await env.app.inject({ method: 'POST', url: `/api/conversations/${id}/messages`, headers: h, payload: { content: text } });
+    const res = await env.app.inject({
+      method: 'POST',
+      url: `/api/conversations/${id}/messages`,
+      headers: h,
+      payload: { content: text },
+    });
     expect(res.statusCode).toBe(202);
     await env.ctx.runs.idle();
     return (await env.app.inject({ url: `/api/conversations/${id}`, headers: h })).json().messages as {
@@ -1089,7 +1173,10 @@ describe('лимит шагов и неудачи инструментов', () 
   it('на последнем шаге инструменты не даются: модель обязана ответить итогом, а не упереться в лимит', async () => {
     env = await createTestEnv({
       config: { AGENT_MAX_STEPS: '2' },
-      script: (req) => (req.tools && req.tools.length > 0 ? { toolCalls: [toolCall('get_time', {}, 't1')] } : { content: 'итог без инструментов' }),
+      script: (req) =>
+        req.tools && req.tools.length > 0
+          ? { toolCalls: [toolCall('get_time', {}, 't1')] }
+          : { content: 'итог без инструментов' },
     });
     const msgs = await run(await login(env.app), 'что по времени?');
     expect(msgs.at(-1)).toMatchObject({ role: 'assistant', content: 'итог без инструментов' });
@@ -1103,7 +1190,9 @@ describe('лимит шагов и неудачи инструментов', () 
         const sys = String(req.messages[0]!.content);
         if (sys.includes('субагент-исследователь')) return { toolCalls: [toolCall('get_time', {}, 'g1')] }; // упирается в лимит
         const last = req.messages.at(-1)!;
-        return last.role === 'tool' ? { content: 'не вышло' } : { toolCalls: [toolCall('research', { question: 'Что нового в теме?' }, 'r1')] };
+        return last.role === 'tool'
+          ? { content: 'не вышло' }
+          : { toolCalls: [toolCall('research', { question: 'Что нового в теме?' }, 'r1')] };
       },
     });
     const msgs = await run(await login(env.app), 'исследуй');

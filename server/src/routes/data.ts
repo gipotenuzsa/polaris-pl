@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
+import { COOKIE_NAME } from '../auth/auth.js';
 import { parse } from '../auth/auth.js';
 import type { AppContext } from '../context.js';
 import { toMemoryDto } from '../services/memory.js';
@@ -11,6 +12,19 @@ const idParams = z.object({ id: z.string().uuid() });
 const memoryKind = z.enum(['fact', 'preference']);
 
 export function dataRoutes(app: FastifyInstance, ctx: AppContext): void {
+  app.post('/api/data/clear-chats', async (req) => {
+    parse(z.object({ confirm: z.literal(true) }), req.body);
+    await ctx.data.clearChats();
+    return { ok: true };
+  });
+
+  app.post('/api/data/clear-all', async (req, reply) => {
+    parse(z.object({ confirm: z.literal(true) }), req.body);
+    await ctx.data.clearAll();
+    reply.clearCookie(COOKIE_NAME, { path: '/' });
+    return { ok: true };
+  });
+
   // ── Память ────────────────────────────────────────────────────────────────
   app.get('/api/memory', async (req) => {
     const { kind } = parse(z.object({ kind: memoryKind.optional() }), req.query);

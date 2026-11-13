@@ -88,8 +88,8 @@ export default function More() {
         />
         <Item
           icon="albums-outline"
-          title="Архив тем"
-          hint="Отдельные чаты вне основного разговора"
+          title="Все чаты"
+          hint="История разговоров и сводки"
           onPress={() => router.push('/chats')}
         />
         <Item icon="document-text-outline" title="Заметки" onPress={() => router.push('/notes')} />

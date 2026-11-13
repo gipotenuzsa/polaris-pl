@@ -13,12 +13,15 @@ import {
   type TextInputProps,
   type TextStyle,
   type ViewStyle,
+  type PressableStateCallbackType,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { PressScale, TypingDots, FadeIn } from './motion';
 import { colors, radius, space } from './theme';
 
 export type IconName = ComponentProps<typeof Ionicons>['name'];
+/** React Native Web adds hover to the native press state. */
+export type HoverState = PressableStateCallbackType & { hovered?: boolean };
 
 export function Screen({ children, edges }: { children: ReactNode; edges?: ('top' | 'bottom' | 'left' | 'right')[] }) {
   return (
@@ -44,7 +47,11 @@ export function Card({
       </PressScale>
     );
   }
-  return <FadeIn distance={6} style={[s.card, style]}>{children}</FadeIn>;
+  return (
+    <FadeIn distance={6} style={[s.card, style]}>
+      {children}
+    </FadeIn>
+  );
 }
 
 export function Button({
@@ -64,9 +71,7 @@ export function Button({
   icon?: IconName;
   style?: StyleProp<ViewStyle>;
 }) {
-  const bg = { primary: colors.ink, secondary: colors.surface, danger: colors.danger, ghost: 'transparent' }[
-    variant
-  ];
+  const bg = { primary: colors.ink, secondary: colors.surface, danger: colors.danger, ghost: 'transparent' }[variant];
   const fg =
     variant === 'primary' || variant === 'danger'
       ? colors.accentText
@@ -77,6 +82,7 @@ export function Button({
   return (
     <PressScale
       accessibilityRole="button"
+      accessibilityLabel={title}
       onPress={off ? undefined : onPress}
       style={[
         s.button,
@@ -204,7 +210,12 @@ export function Toggle({
         <Text style={s.body}>{label}</Text>
         {hint ? <Text style={s.muted}>{hint}</Text> : null}
       </View>
-      <Switch value={value} onValueChange={onChange} trackColor={{ true: colors.ink, false: colors.border }} thumbColor={colors.surface} />
+      <Switch
+        value={value}
+        onValueChange={onChange}
+        trackColor={{ true: colors.ink, false: colors.border }}
+        thumbColor={colors.surface}
+      />
     </Row>
   );
 }

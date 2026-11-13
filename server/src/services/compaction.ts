@@ -46,6 +46,10 @@ export class CompactionService {
 
   constructor(private readonly ctx: AppContext) {}
 
+  isRunning(): boolean {
+    return this.running.size > 0;
+  }
+
   /** Запускает сжатие, если оно нужно. Ошибки не пробрасываются: это фоновая оптимизация. */
   async maybeCompact(conversationId: string): Promise<boolean> {
     if (this.running.has(conversationId)) return false;

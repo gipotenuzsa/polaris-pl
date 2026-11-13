@@ -61,6 +61,15 @@ export function urlForNotification(kind: string, ref?: { conversationId?: string
  */
 export class PushService {
   private vapidCache: { publicKey: string; privateKey: string } | null = null;
+  private pending = 0;
+
+  get isSending(): boolean {
+    return this.pending > 0;
+  }
+
+  clearCache(): void {
+    this.vapidCache = null;
+  }
 
   constructor(
     private readonly ctx: AppContext,
@@ -194,6 +203,11 @@ export class PushService {
 
   /** Отправка «в фоне»: ошибки только логируются, вызывающий код не ждёт. */
   notify(payload: PushPayload): void {
-    void this.send(payload).catch((err: unknown) => this.ctx.log.warn({ err: String(err) }, 'Web Push: сбой отправки'));
+    this.pending++;
+    void this.send(payload)
+      .catch((err: unknown) => this.ctx.log.warn({ err: String(err) }, 'Web Push: сбой отправки'))
+      .finally(() => {
+        this.pending--;
+      });
   }
 }

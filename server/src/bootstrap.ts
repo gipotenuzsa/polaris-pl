@@ -15,6 +15,7 @@ import { BudgetService } from './services/budget.js';
 import { CheckinsService } from './services/checkins.js';
 import { CompactionService } from './services/compaction.js';
 import { ConversationService } from './services/conversations.js';
+import { DataService } from './services/data.js';
 import { MemoryService } from './services/memory.js';
 import { MorningService } from './services/morning.js';
 import { NotesService, RemindersService } from './services/notes.js';
@@ -96,6 +97,7 @@ export async function createContext(opts: BootstrapOptions): Promise<AppContext>
   ctx.tasks = new TaskService(ctx);
   ctx.morning = new MorningService(ctx);
   ctx.scheduler = new Scheduler(ctx);
+  ctx.data = new DataService(ctx);
   ctx.providers = new ProviderChain(opts.providers ?? buildProviders(ctx), {
     timeoutMs: config.providers.timeoutMs,
     log,

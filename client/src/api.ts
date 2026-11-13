@@ -216,12 +216,12 @@ export const api = {
       /** Текст ответа, который модель пишет прямо сейчас (стриминг) */
       live: string;
       pendingApprovals: Approval[];
-    }>(
-      `/api/conversations/${id}${q({ after: opts.after ?? 0, limit: opts.limit, before: opts.before })}`,
-    ),
+    }>(`/api/conversations/${id}${q({ after: opts.after ?? 0, limit: opts.limit, before: opts.before })}`),
   renameConversation: (id: string, title: string) => patch<{ ok: true }>(`/api/conversations/${id}`, { title }),
   pinConversation: (id: string, pinned: boolean) => patch<{ ok: true }>(`/api/conversations/${id}`, { pinned }),
   deleteConversation: (id: string) => del<{ ok: true }>(`/api/conversations/${id}`),
+  clearChats: () => post<{ ok: true }>('/api/data/clear-chats', { confirm: true }),
+  clearAllData: () => post<{ ok: true }>('/api/data/clear-all', { confirm: true }),
   stopConversation: (id: string) => post<{ stopped: boolean }>(`/api/conversations/${id}/stop`),
   sendMessage: (id: string, content: string, attachmentIds: string[] = []) =>
     post<{ message: Message; running: boolean }>(`/api/conversations/${id}/messages`, { content, attachmentIds }),
@@ -268,14 +268,18 @@ export const api = {
   saveBudget: (limits: BudgetLimits) => put<BudgetSummary>('/api/budget', limits),
 
   settings: () =>
-    get<{ morning: MorningSettings; checkins: CheckinsSettings; agent: { instructions: string }; timezone: string }>('/api/settings'),
-  saveCheckins: (c: Omit<CheckinsSettings, 'lastRunAt'>) => put<{ checkins: CheckinsSettings }>('/api/settings/checkins', c),
+    get<{ morning: MorningSettings; checkins: CheckinsSettings; agent: { instructions: string }; timezone: string }>(
+      '/api/settings',
+    ),
+  saveCheckins: (c: Omit<CheckinsSettings, 'lastRunAt'>) =>
+    put<{ checkins: CheckinsSettings }>('/api/settings/checkins', c),
   runCheckin: () => post<{ posted: boolean; text?: string }>('/api/checkins/run'),
   regenerate: (id: string) => post<{ running: boolean }>(`/api/conversations/${id}/regenerate`),
   rewind: (id: string) => post<{ content: string }>(`/api/conversations/${id}/rewind`),
   searchConversation: (id: string, q: string) =>
     get<{ results: SearchHit[] }>(`/api/conversations/${id}/search${q_({ q })}`),
-  restoreBackup: (backup: unknown) => post<{ ok: true; counts: Record<string, number> }>('/api/backup/restore', { replace: true, backup }),
+  restoreBackup: (backup: unknown) =>
+    post<{ ok: true; counts: Record<string, number> }>('/api/backup/restore', { replace: true, backup }),
   saveMorning: (m: { enabled: boolean; time: string; timezone: string }) =>
     put<{ morning: MorningSettings }>('/api/settings/morning', m),
   saveAgent: (instructions: string) =>

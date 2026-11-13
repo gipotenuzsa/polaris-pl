@@ -72,6 +72,15 @@ export async function buildApp(ctx: AppContext, opts: { logger?: PinoLogger } = 
   });
 
   registerAuth(app, ctx);
+  app.addHook('preHandler', async (req) => {
+    if (!req.url.startsWith('/api/') && !req.url.startsWith('/internal/')) return;
+    const url = req.url.split('?')[0];
+    ctx.data.enterRequest(
+      req.id,
+      !['GET', 'HEAD', 'OPTIONS'].includes(req.method) || url === '/api/main' || url === '/api/push/status',
+    );
+  });
+  app.addHook('onResponse', async (req) => ctx.data.leaveRequest(req.id));
   systemRoutes(app, ctx);
   chatRoutes(app, ctx);
   dataRoutes(app, ctx);

@@ -3,6 +3,9 @@ import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { KeyboardAvoidingView, Linking, Platform, RefreshControl, ScrollView, Text, View } from 'react-native';
 import { api, downloadBackup } from '../src/api';
+import { useAuth } from '../src/auth';
+import { useChatWorkspace } from '../src/ChatWorkspace';
+import { Dialog } from '../src/Dialog';
 import { formatNumber } from '../src/format';
 import { useLoad } from '../src/hooks';
 import { disablePush, enablePush, pushState } from '../src/push';
@@ -27,6 +30,97 @@ import {
 } from '../src/ui';
 
 const errText = (e: unknown) => (e instanceof Error ? e.message : String(e));
+
+function DataControls() {
+  const { signOut } = useAuth();
+  const { clearChatState } = useChatWorkspace();
+  const [mode, setMode] = useState<'chats' | 'all' | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const remove = async () => {
+    if (!mode || busy) return;
+    setBusy(true);
+    setError(null);
+    try {
+      if (mode === 'chats') {
+        await api.clearChats();
+        setMode(null);
+        clearChatState();
+      } else {
+        await api.clearAllData();
+        setMode(null);
+        if (Platform.OS === 'web') {
+          try {
+            sessionStorage.removeItem('polaris.share');
+          } catch {
+            /* storage unavailable */
+          }
+        }
+        await signOut();
+      }
+    } catch (e) {
+      setError(errText(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+  const open = (value: 'chats' | 'all') => {
+    setError(null);
+    setMode(value);
+  };
+  return (
+    <>
+      <Card>
+        <Body>Ваши данные под вашим контролем.</Body>
+        <Muted style={{ marginTop: 4, marginBottom: space.lg }}>
+          Отдельный чат можно удалить через меню ⋯ рядом с его названием.
+        </Muted>
+        <View style={{ gap: space.md }}>
+          <View>
+            <Button
+              title="Удалить все чаты"
+              icon="chatbubbles-outline"
+              variant="secondary"
+              onPress={() => open('chats')}
+            />
+            <Muted style={{ fontSize: 12, marginTop: 6 }}>
+              Переписка и фото удалятся. Память, задачи и настройки сохранятся.
+            </Muted>
+          </View>
+          <View>
+            <Button title="Удалить все данные" icon="trash-outline" variant="danger" onPress={() => open('all')} />
+            <Muted style={{ fontSize: 12, marginTop: 6 }}>
+              Полностью очистить Polaris, включая файлы и подключение ChatGPT.
+            </Muted>
+          </View>
+        </View>
+      </Card>
+      <Dialog
+        title={mode === 'all' ? 'Удалить все данные?' : 'Удалить все чаты?'}
+        visible={mode !== null}
+        onClose={() => {
+          if (!busy) setMode(null);
+        }}
+      >
+        <ErrorNote message={error} />
+        <Muted style={{ lineHeight: 22, marginBottom: space.xl }}>
+          {mode === 'all'
+            ? 'Все чаты, фотографии, файлы, память, заметки, задачи, напоминания, журнал и настройки будут удалены. Подключение ChatGPT и все сеансы входа сбросятся. Это действие нельзя отменить.'
+            : 'Все чаты, сводки и прикреплённые фотографии будут удалены без возможности восстановления. Память, задачи с их историей, заметки, файлы и настройки сохранятся.'}
+        </Muted>
+        <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 8 }}>
+          <Button title="Отмена" variant="secondary" disabled={busy} onPress={() => setMode(null)} />
+          <Button
+            title={mode === 'all' ? 'Удалить всё' : 'Удалить чаты'}
+            variant="danger"
+            loading={busy}
+            onPress={() => void remove()}
+          />
+        </View>
+      </Dialog>
+    </>
+  );
+}
 
 // ── Провайдеры и ChatGPT ───────────────────────────────────────────────────────
 
@@ -75,8 +169,8 @@ function ChatGptCard({ status, onChange }: { status: ChatGptStatus; onChange: ()
       <View style={{ backgroundColor: colors.warnBg, borderRadius: 8, padding: space.md, marginBottom: space.md }}>
         <Text style={{ color: colors.warn, fontSize: 13, lineHeight: 19 }}>
           Только для личного использования на своей подписке ChatGPT Plus/Pro. Это неофициальный способ доступа: условия
-          OpenAI могут его ограничивать, а интерфейс — меняться без предупреждения. Одна подписка на инстанс.
-          ChatGPT — единственный провайдер моделей в Polaris.
+          OpenAI могут его ограничивать, а интерфейс — меняться без предупреждения. Одна подписка на инстанс. ChatGPT —
+          единственный провайдер моделей в Polaris.
         </Text>
       </View>
 
@@ -493,7 +587,13 @@ function CheckinsForm({ initial, onSaved }: { initial: CheckinsSettings; onSaved
           loading={busy === 'save'}
           onPress={() =>
             run('save', async () => {
-              await api.saveCheckins({ enabled, everyHours: hours, quietFrom: from.trim(), quietTo: to.trim(), timezone: initial.timezone });
+              await api.saveCheckins({
+                enabled,
+                everyHours: hours,
+                quietFrom: from.trim(),
+                quietTo: to.trim(),
+                timezone: initial.timezone,
+              });
               await onSaved();
               notify('Сохранено');
             })
@@ -507,7 +607,10 @@ function CheckinsForm({ initial, onSaved }: { initial: CheckinsSettings; onSaved
           onPress={() =>
             run('now', async () => {
               const r = await api.runCheckin();
-              notify(r.posted ? 'Есть что сказать' : 'Пока сообщать нечего', r.posted ? 'Сообщение появилось в разговоре.' : 'Polaris проверил дела и решил промолчать.');
+              notify(
+                r.posted ? 'Есть что сказать' : 'Пока сообщать нечего',
+                r.posted ? 'Сообщение появилось в разговоре.' : 'Polaris проверил дела и решил промолчать.',
+              );
             })
           }
           style={{ marginBottom: space.sm }}
@@ -522,7 +625,11 @@ function CheckinsCard() {
   return (
     <>
       <ErrorNote message={error} />
-      {data ? <CheckinsForm key={JSON.stringify(data.checkins)} initial={data.checkins} onSaved={refresh} /> : <Loading />}
+      {data ? (
+        <CheckinsForm key={JSON.stringify(data.checkins)} initial={data.checkins} onSaved={refresh} />
+      ) : (
+        <Loading />
+      )}
     </>
   );
 }
@@ -534,7 +641,10 @@ function BackupCard() {
   if (Platform.OS !== 'web') {
     return (
       <Card>
-        <Muted>Копию данных можно скачать и восстановить в веб-версии (откройте адрес сервера в браузере) и в Windows-приложении.</Muted>
+        <Muted>
+          Копию данных можно скачать и восстановить в веб-версии (откройте адрес сервера в браузере) и в
+          Windows-приложении.
+        </Muted>
       </Card>
     );
   }
@@ -557,11 +667,21 @@ function BackupCard() {
     input.onchange = async () => {
       const file = input.files?.[0];
       if (!file) return;
-      if (!(await confirmAction('Заменить данные?', `Все текущие данные на этом сервере (переписка, память, задачи) будут заменены содержимым файла «${file.name}». Это нельзя отменить.`, 'Заменить'))) return;
+      if (
+        !(await confirmAction(
+          'Заменить данные?',
+          `Все текущие данные на этом сервере (переписка, память, задачи) будут заменены содержимым файла «${file.name}». Это нельзя отменить.`,
+          'Заменить',
+        ))
+      )
+        return;
       setBusy('restore');
       try {
         const counts = await api.restoreBackup(JSON.parse(await file.text()));
-        notify('Данные восстановлены', `Сообщений: ${counts.counts.messages ?? 0}, записей памяти: ${counts.counts.memory ?? 0}. Страница перезагрузится.`);
+        notify(
+          'Данные восстановлены',
+          `Сообщений: ${counts.counts.messages ?? 0}, записей памяти: ${counts.counts.memory ?? 0}. Страница перезагрузится.`,
+        );
         globalThis.location?.assign('/');
       } catch (e) {
         notify('Не удалось восстановить', errText(e));
@@ -575,12 +695,25 @@ function BackupCard() {
   return (
     <Card>
       <Muted style={{ marginBottom: space.md }}>
-        Файл со всей перепиской, памятью, заметками, задачами и настройками. Нужен для переезда на другую базу данных и как страховка. Вход в ChatGPT и
-        уведомления в копию не входят — после переезда подключите их заново.
+        Файл со всей перепиской, памятью, заметками, задачами и настройками. Нужен для переезда на другую базу данных и
+        как страховка. Вход в ChatGPT и уведомления в копию не входят — после переезда подключите их заново.
       </Muted>
       <Row style={{ flexWrap: 'wrap' }}>
-        <Button title="Скачать копию" icon="download-outline" loading={busy === 'download'} onPress={download} style={{ marginRight: space.sm, marginBottom: space.sm }} />
-        <Button title="Восстановить из файла" variant="secondary" icon="cloud-upload-outline" loading={busy === 'restore'} onPress={restore} style={{ marginBottom: space.sm }} />
+        <Button
+          title="Скачать копию"
+          icon="download-outline"
+          loading={busy === 'download'}
+          onPress={download}
+          style={{ marginRight: space.sm, marginBottom: space.sm }}
+        />
+        <Button
+          title="Восстановить из файла"
+          variant="secondary"
+          icon="cloud-upload-outline"
+          loading={busy === 'restore'}
+          onPress={restore}
+          style={{ marginBottom: space.sm }}
+        />
       </Row>
     </Card>
   );
@@ -683,12 +816,21 @@ export default function Settings() {
     <Screen>
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView
-          contentContainerStyle={{ padding: space.lg, paddingBottom: 60 }}
+          contentContainerStyle={{
+            padding: space.lg,
+            paddingBottom: 60,
+            maxWidth: 800,
+            width: '100%',
+            alignSelf: 'center',
+          }}
           keyboardShouldPersistTaps="handled"
           refreshControl={<RefreshControl refreshing={false} onRefresh={refresh} tintColor={colors.accent} />}
         >
           <ErrorNote message={error} onRetry={refresh} />
           {loading && !data ? <Loading /> : null}
+
+          <SectionTitle>Управление данными</SectionTitle>
+          <DataControls />
 
           {Platform.OS === 'web' ? (
             <>

@@ -25,6 +25,11 @@ const POLL_MS = 15_000;
  */
 export function StatusProvider({ children }: { children: ReactNode }) {
   const { state } = useAuth();
+  return <StatusSession key={state}>{children}</StatusSession>;
+}
+
+function StatusSession({ children }: { children: ReactNode }) {
+  const { state } = useAuth();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const [counts, setCounts] = useState({ unread: 0, approvals: 0 });
@@ -61,6 +66,7 @@ export function StatusProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (state !== 'in') {
       seen.current = null;
+      clearTimeout(hide.current);
       return;
     }
     const first = setTimeout(() => void refresh(), 0);
