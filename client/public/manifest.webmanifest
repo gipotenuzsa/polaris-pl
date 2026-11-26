@@ -1,13 +1,13 @@
 {
-  "name": "Polaris",
-  "short_name": "Polaris",
+  "name": "ChatGTT",
+  "short_name": "ChatGTT",
   "description": "Личный фоновый AI-агент",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#F5F0E6",
-  "theme_color": "#F5F0E6",
+  "background_color": "#FFFFFF",
+  "theme_color": "#FFFFFF",
   "lang": "ru",
   "share_target": { "action": "/share", "method": "GET", "params": { "title": "title", "text": "text", "url": "url" } },
   "icons": [

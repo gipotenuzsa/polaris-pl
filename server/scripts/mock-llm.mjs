@@ -1,4 +1,4 @@
-// Демо-модель: OpenAI-совместимый /v1/chat/completions с вызовами инструментов — для проверки Polaris без ключей.
+// Демо-модель: OpenAI-совместимый /v1/chat/completions с вызовами инструментов — для проверки ChatGTT без ключей.
 //   node scripts/mock-llm.mjs [порт=8799]
 // Подключение:  OPENROUTER_API_KEY=demo OPENROUTER_BASE_URL=http://127.0.0.1:8799/v1 OPENROUTER_MODEL=mock
 import http from 'node:http';
@@ -6,7 +6,7 @@ import http from 'node:http';
 const port = Number(process.argv[2] ?? process.env.PORT ?? 8799);
 
 const HELP =
-  'Привет! Я демо-модель Polaris. Попробуйте: «запомни, что я люблю чай», «создай заметку про отпуск», ' +
+  'Привет! Я демо-модель ChatGTT. Попробуйте: «запомни, что я люблю чай», «создай заметку про отпуск», ' +
   '«создай файл», «удали файл demo.txt», «напомни выпить воды», «создай задачу проверять новости».';
 
 function reply(body) {
@@ -43,7 +43,7 @@ function reply(body) {
       kind: 'preference',
       content: text.replace(/^.*?запомни,?\s*(что)?\s*/i, '').slice(0, 200) || text,
     });
-  if (lower.includes('заметк')) return call('note_create', { title: 'Заметка от Polaris', body: text });
+  if (lower.includes('заметк')) return call('note_create', { title: 'Заметка от ChatGTT', body: text });
   if (lower.includes('удали файл'))
     return call('file_delete', { path: (/файл\s+(\S+)/i.exec(text)?.[1] ?? 'demo.txt').replace(/[.,;]$/, '') });
   if (lower.includes('создай файл') || lower.includes('запиши файл'))

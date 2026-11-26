@@ -72,7 +72,7 @@ export default function Notes() {
           !loading ? (
             <Empty
               icon="document-text-outline"
-              text="Заметок нет. Попросите Polaris записать что-нибудь или добавьте заметку кнопкой ＋."
+              text="Заметок нет. Попросите ChatGTT записать что-нибудь или добавьте заметку кнопкой ＋."
             />
           ) : undefined
         }

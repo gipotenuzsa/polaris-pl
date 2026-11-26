@@ -1,4 +1,4 @@
-// Генератор иконок Polaris (Северная звезда) без внешних зависимостей: node scripts/gen-assets.mjs
+// Генератор иконок ChatGTT (зелёный квадрат с белым узлом) без внешних зависимостей: node scripts/gen-assets.mjs
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { deflateSync } from 'node:zlib';
 
@@ -49,41 +49,35 @@ function png(size, pixel) {
 const mix = (a, b, t) => a + (b - a) * t;
 const clamp01 = (v) => Math.min(1, Math.max(0, v));
 
-/** Четырёхлучевая звезда (астроида): |x|^(2/3) + |y|^(2/3) = R^(2/3). Возвращает покрытие и свечение. */
-function star(u, v, radius) {
-  const x = Math.abs(u - 0.5),
-    y = Math.abs(v - 0.5);
-  const f = Math.pow(x, 2 / 3) + Math.pow(y, 2 / 3);
-  const edge = Math.pow(radius, 2 / 3);
-  const d = f - edge;
-  const cover = clamp01(0.5 - d / 0.012);
-  const glow = Math.exp(-Math.max(0, d) * 9) * 0.55;
-  const core = Math.exp(-(x * x + y * y) / 0.0012);
-  return { cover, glow, core };
+/** Узел из шести переплетённых петель (в духе логотипа ChatGPT). Возвращает покрытие 0..1. */
+function knot(u, v, scale) {
+  const x = (u - 0.5) / scale,
+    y = (v - 0.5) / scale;
+  let cover = 0;
+  for (let k = 0; k < 6; k++) {
+    const th = (k * Math.PI) / 3;
+    const cx = Math.cos(th) * 0.17,
+      cy = Math.sin(th) * 0.17;
+    const dx = x - cx,
+      dy = y - cy;
+    const t2 = th + 1.0;
+    const rx = dx * Math.cos(t2) + dy * Math.sin(t2);
+    const ry = -dx * Math.sin(t2) + dy * Math.cos(t2);
+    const d = Math.hypot(rx / 0.34, ry / 0.2);
+    const ring = clamp01(0.5 - (Math.abs(d - 1) - 0.12) / 0.03);
+    cover = Math.max(cover, ring);
+  }
+  return cover;
 }
 
-function icon({ background, radius, transparent }) {
+function icon({ background, radius }) {
   return (u, v) => {
-    const { cover, glow, core } = star(u, v, radius);
-    let bg = [0, 0, 0, 0];
-    if (background) {
-      const d = Math.hypot(u - 0.5, v - 0.42);
-      const t = clamp01(d / 0.75);
-      bg = [mix(250, 232, t), mix(245, 222, t), mix(236, 203, t), 255];
-    }
-    const glowA = clamp01(glow) * 0.45;
-    const base = background ? bg : [0, 0, 0, 0];
-    const gcol = [184, 97, 58];
-    let out = [
-      mix(base[0], gcol[0], glowA),
-      mix(base[1], gcol[1], glowA),
-      mix(base[2], gcol[2], glowA),
-      transparent ? Math.max(base[3], glowA * 255) : 255,
-    ];
-    const white = [43, 38, 32];
-    const k = clamp01(cover + core * 0.6);
-    out = [mix(out[0], white[0], k), mix(out[1], white[1], k), mix(out[2], white[2], k), Math.max(out[3], k * 255)];
-    return out.map((c) => Math.round(c));
+    const k = knot(u, v, radius / 0.32 * 0.95);
+    const bg = background ? [63, 63, 70] : [0, 0, 0];
+    const white = [255, 255, 255];
+    const a = background ? 255 : Math.round(k * 255);
+    const c = background ? bg.map((b, i) => mix(b, white[i], k)) : white;
+    return [...c.map((x) => Math.round(x)), a];
   };
 }
 
@@ -91,19 +85,19 @@ mkdirSync('assets', { recursive: true });
 mkdirSync('public', { recursive: true });
 const write = (path, size, fn) => writeFileSync(path, png(size, fn));
 
-write('assets/icon.png', 1024, icon({ background: true, radius: 0.32, transparent: false }));
-write('assets/adaptive-icon.png', 1024, icon({ background: false, radius: 0.2, transparent: true }));
-write('assets/splash-icon.png', 1024, icon({ background: false, radius: 0.22, transparent: true }));
-write('assets/favicon.png', 64, icon({ background: true, radius: 0.34, transparent: false }));
-write('public/icon-192.png', 192, icon({ background: true, radius: 0.32, transparent: false }));
-write('public/icon-512.png', 512, icon({ background: true, radius: 0.32, transparent: false }));
-write('public/apple-touch-icon.png', 180, icon({ background: true, radius: 0.32, transparent: false }));
+write('assets/icon.png', 1024, icon({ background: true, radius: 0.32 }));
+write('assets/adaptive-icon.png', 1024, icon({ background: false, radius: 0.2 }));
+write('assets/splash-icon.png', 1024, icon({ background: false, radius: 0.22 }));
+write('assets/favicon.png', 64, icon({ background: true, radius: 0.34 }));
+write('public/icon-192.png', 192, icon({ background: true, radius: 0.32 }));
+write('public/icon-512.png', 512, icon({ background: true, radius: 0.32 }));
+write('public/apple-touch-icon.png', 180, icon({ background: true, radius: 0.32 }));
 console.log('Иконки созданы: assets/, public/');
 
 // Иконки для Windows-приложения (desktop/build): PNG для окна и ICO (PNG-in-ICO, 256×256) для .exe
 const desktopBuild = '../desktop/build';
 mkdirSync(desktopBuild, { recursive: true });
-const iconFn = icon({ background: true, radius: 0.32, transparent: false });
+const iconFn = icon({ background: true, radius: 0.32 });
 write(`${desktopBuild}/icon.png`, 512, iconFn);
 const png256 = png(256, iconFn);
 const header = Buffer.alloc(22);

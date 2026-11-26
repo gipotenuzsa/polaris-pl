@@ -59,7 +59,7 @@ export class BackupService {
   async restore(file: unknown): Promise<Record<string, number>> {
     const f = file as Partial<BackupFile> | null;
     if (!f || f.format !== BACKUP_FORMAT || f.version !== 1 || typeof f.tables !== 'object' || f.tables === null) {
-      throw badRequest('Это не резервная копия Polaris (ожидался файл, скачанный в разделе «Резервная копия»)');
+      throw badRequest('Это не резервная копия ChatGTT (ожидался файл, скачанный в разделе «Резервная копия»)');
     }
     const counts: Record<string, number> = {};
     await this.ctx.db.transaction(async (tx: Db) => {

@@ -2,7 +2,7 @@
   "name": "polaris-pl",
   "version": "0.1.0",
   "private": true,
-  "description": "Polaris — открытый self-hosted фоновый AI-агент",
+  "description": "ChatGTT — открытый self-hosted фоновый AI-агент",
   "license": "MIT",
   "engines": {
     "node": ">=22"

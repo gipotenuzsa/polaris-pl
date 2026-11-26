@@ -70,7 +70,7 @@ export default function More() {
 
   return (
     <Screen edges={['left', 'right', 'bottom']}>
-      <Header title="Ещё" subtitle="Всё остальное в Polaris" back />
+      <Header title="Ещё" subtitle="Всё остальное в ChatGTT" back />
       <ScrollView contentContainerStyle={{ padding: space.lg, width: '100%', maxWidth: 760, alignSelf: 'center' }}>
         <Item
           icon="shield-checkmark-outline"
@@ -114,7 +114,7 @@ export default function More() {
         <View style={{ marginTop: space.lg }}>
           {status ? (
             <Muted style={{ textAlign: 'center', marginBottom: space.md }}>
-              Polaris {status.version} · инструментов: {status.tools.length} · часовой пояс {status.timezone}
+              ChatGTT {status.version} · инструментов: {status.tools.length} · часовой пояс {status.timezone}
             </Muted>
           ) : null}
           <Button title="Выйти" variant="secondary" icon="log-out-outline" onPress={signOut} />

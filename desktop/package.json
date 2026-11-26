@@ -1,10 +1,10 @@
 {
   "name": "polaris-desktop",
-  "productName": "Polaris",
+  "productName": "ChatGTT",
   "version": "0.1.0",
   "private": true,
-  "description": "Polaris для Windows: локальный сервер и интерфейс в одном окне",
-  "author": "Polaris contributors",
+  "description": "ChatGTT для Windows: локальный сервер и интерфейс в одном окне",
+  "author": "ChatGTT contributors",
   "license": "MIT",
   "main": "main.mjs",
   "type": "module",
@@ -16,7 +16,7 @@
   },
   "build": {
     "appId": "pl.polaris.desktop",
-    "productName": "Polaris",
+    "productName": "ChatGTT",
     "copyright": "MIT",
     "directories": {
       "output": "release",
@@ -54,13 +54,13 @@
       ]
     },
     "portable": {
-      "artifactName": "Polaris-${version}-portable.exe"
+      "artifactName": "ChatGTT-${version}-portable.exe"
     },
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
-      "artifactName": "Polaris-Setup-${version}.exe",
-      "shortcutName": "Polaris"
+      "artifactName": "ChatGTT-Setup-${version}.exe",
+      "shortcutName": "ChatGTT"
     }
   },
   "devDependencies": {

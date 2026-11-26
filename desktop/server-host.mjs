@@ -1,4 +1,4 @@
-// Запускает сервер Polaris внутри процесса Electron. Сервер — тот же код, что и на Render (server/dist).
+// Запускает сервер ChatGTT внутри процесса Electron. Сервер — тот же код, что и на Render (server/dist).
 import fs from 'node:fs';
 import { createRequire } from 'node:module';
 import path from 'node:path';
@@ -30,7 +30,7 @@ export async function startServer({ contentDir, logFile, env }) {
   const app = await buildApp(ctx, { logger });
   await ctx.scheduler.start();
   await app.listen({ port: config.port, host: '127.0.0.1' });
-  logger.info({ port: config.port }, 'Polaris (desktop) запущен');
+  logger.info({ port: config.port }, 'ChatGTT (desktop) запущен');
 
   return {
     port: config.port,

@@ -90,7 +90,7 @@ describe('Web Push', () => {
     const res = await env.app.inject({ method: 'POST', url: '/api/push/test', headers: h });
     expect(res.json()).toEqual({ sent: 2, removed: 0, failed: 0 });
     expect(sent.map((s) => s.endpoint).sort()).toEqual([sub(1).endpoint, sub(2).endpoint]);
-    expect(sent[0]!.payload).toMatchObject({ title: 'Polaris', url: '/inbox', tag: 'push-test' });
+    expect(sent[0]!.payload).toMatchObject({ title: 'ChatGTT', url: '/inbox', tag: 'push-test' });
     // подпись VAPID: открытый ключ совпадает с тем, что получает клиент, закрытый расшифрован
     const status = (await env.app.inject({ url: '/api/push/status', headers: h })).json();
     expect(sent[0]!.options.vapidDetails.publicKey).toBe(status.publicKey);
@@ -180,7 +180,7 @@ describe('Web Push', () => {
     await env.ctx.runs.idle();
     await waitFor(async () => sent.length === 1);
     expect(sent[0]!.payload).toMatchObject({
-      title: 'Polaris',
+      title: 'ChatGTT',
       url: `/chat/${conversation.id}`,
       tag: `chat-${conversation.id}`,
     });

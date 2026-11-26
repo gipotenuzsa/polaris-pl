@@ -31,7 +31,7 @@ export default function Approvals() {
         ListHeaderComponent={
           <>
             <Muted>
-              Polaris выполняет рискованные действия — удаление, перезапись, отправку, действия в браузере — только
+              ChatGTT выполняет рискованные действия — удаление, перезапись, отправку, действия в браузере — только
               после вашего «Одобрить».
             </Muted>
             {pending.length ? <SectionTitle>Ждут решения ({pending.length})</SectionTitle> : null}

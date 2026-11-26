@@ -1,4 +1,4 @@
-// Polaris для Windows: окно Electron + локальный сервер Polaris в одном процессе.
+// ChatGTT для Windows: окно Electron + локальный сервер ChatGTT в одном процессе.
 // Режимы: «локальный» (по умолчанию: сервер, база и файлы на этом ПК) и «удалённый» (окно-клиент к серверу на Render).
 import { randomBytes } from 'node:crypto';
 import fs from 'node:fs';
@@ -25,7 +25,7 @@ let quitting = false;
 
 // ── Настройки ──────────────────────────────────────────────────────────────────
 
-const ENV_TEMPLATE = `# Настройки Polaris для Windows. Строки вида КЛЮЧ=значение; «#» — комментарий.
+const ENV_TEMPLATE = `# Настройки ChatGTT для Windows. Строки вида КЛЮЧ=значение; «#» — комментарий.
 # После изменений: меню «Сервер → Перезапустить сервер».
 #
 # Модели: только ChatGPT по OAuth. Войдите в приложении: Ещё → Настройки → ChatGPT.
@@ -135,12 +135,12 @@ async function freePort(preferred) {
 const page = (title, body) =>
   'data:text/html;charset=utf-8,' +
   encodeURIComponent(`<!doctype html><meta charset="utf-8"><title>${title}</title>
-  <body style="margin:0;display:flex;align-items:center;justify-content:center;height:100vh;background:#F5F0E6;color:#2B2620;font:15px 'Segoe UI',sans-serif">
+  <body style="margin:0;display:flex;align-items:center;justify-content:center;height:100vh;background:#FFFFFF;color:#0D0D0D;font:15px 'Segoe UI',sans-serif">
   <div style="max-width:560px;padding:24px;text-align:center">${body}</div>`);
 
 const loadingPage = page(
-  'Polaris',
-  '<div style="font-size:38px;color:#B8613A">✦</div><h2>Polaris запускается…</h2><p style="color:#8C8272">Поднимаю локальный сервер</p>',
+  'ChatGTT',
+  '<div style="font-size:38px;color:#10A37F">✦</div><h2>ChatGTT запускается…</h2><p style="color:#6B6B6B">Поднимаю локальный сервер</p>',
 );
 
 async function startLocal() {
@@ -200,9 +200,9 @@ async function openLocal() {
     await win?.loadURL(
       page(
         'Ошибка',
-        `<h2 style="color:#B5483A">Не удалось запустить Polaris</h2><p>${message}</p>
-         <p style="color:#8C8272">Журнал: ${logFile.replace(/\\/g, '\\\\')}<br>Настройки: ${envFile.replace(/\\/g, '\\\\')}</p>
-         <p style="color:#8C8272">Исправьте настройки и выберите «Сервер → Перезапустить сервер».</p>`,
+        `<h2 style="color:#EF4444">Не удалось запустить ChatGTT</h2><p>${message}</p>
+         <p style="color:#6B6B6B">Журнал: ${logFile.replace(/\\/g, '\\\\')}<br>Настройки: ${envFile.replace(/\\/g, '\\\\')}</p>
+         <p style="color:#6B6B6B">Исправьте настройки и выберите «Сервер → Перезапустить сервер».</p>`,
       ),
     );
   }
@@ -231,7 +231,7 @@ function askRemoteUrl(current) {
       resizable: false,
       minimizable: false,
       maximizable: false,
-      backgroundColor: '#F5F0E6',
+      backgroundColor: '#FFFFFF',
       webPreferences: {
         preload: path.join(here, 'prompt-preload.cjs'),
         contextIsolation: true,
@@ -269,7 +269,7 @@ function normalizeUrl(input) {
 function buildMenu() {
   const template = [
     {
-      label: 'Polaris',
+      label: 'ChatGTT',
       submenu: [
         { label: 'Перезагрузить окно', accelerator: 'CmdOrCtrl+R', click: () => win?.reload() },
         {
@@ -337,8 +337,8 @@ function buildMenu() {
           click: () =>
             void dialog.showMessageBox(win ?? undefined, {
               type: 'info',
-              title: 'Polaris',
-              message: `Polaris ${app.getVersion()}`,
+              title: 'ChatGTT',
+              message: `ChatGTT ${app.getVersion()}`,
               detail:
                 'Открытый self-hosted фоновый AI-агент.\n' +
                 `Режим: ${readState().mode === 'remote' ? 'удалённый сервер' : 'локальный сервер на этом компьютере'}\n` +
@@ -364,12 +364,12 @@ function createWindow() {
     height: 820,
     minWidth: 420,
     minHeight: 560,
-    backgroundColor: '#F5F0E6',
-    title: 'Polaris',
+    backgroundColor: '#FFFFFF',
+    title: 'ChatGTT',
     icon: fs.existsSync(iconPath) ? nativeImage.createFromPath(iconPath) : undefined,
     webPreferences: { contextIsolation: true, nodeIntegration: false, sandbox: true },
   });
-  win.on('page-title-updated', (e) => e.preventDefault()); // заголовок окна всегда «Polaris»
+  win.on('page-title-updated', (e) => e.preventDefault()); // заголовок окна всегда «ChatGTT»
   // Ссылки наружу (например, вход в ChatGPT) открываем в системном браузере, а не внутри окна
   win.webContents.setWindowOpenHandler(({ url }) => {
     if (/^https?:/i.test(url)) void shell.openExternal(url);

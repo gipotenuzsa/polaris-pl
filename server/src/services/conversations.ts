@@ -174,14 +174,14 @@ export class ConversationService {
     let row = await find();
     if (!row) {
       await this.ctx.db.query(
-        `insert into conversations (title, kind, is_main) values ('Polaris', 'chat', true) on conflict do nothing`,
+        `insert into conversations (title, kind, is_main) values ('ChatGTT', 'chat', true) on conflict do nothing`,
       );
       row = await find();
     }
     return toConversationDto(row!);
   }
 
-  /** Сообщение от Polaris в единый разговор (утренняя сводка, итоги задач). */
+  /** Сообщение от ChatGTT в единый разговор (утренняя сводка, итоги задач). */
   async postToMain(content: string): Promise<void> {
     const main = await this.main();
     await this.add({ conversationId: main.id, role: 'assistant', content, provider: 'polaris' });

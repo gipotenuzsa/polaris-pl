@@ -16,7 +16,7 @@ async function main(): Promise<void> {
   await ctx.scheduler.start();
   const stopPing = startSelfPing({ publicUrl: config.publicUrl, enabled: config.selfPing, log: logger });
   await app.listen({ port: config.port, host: config.host });
-  logger.info({ port: config.port, tools: ctx.tools.all().map((t) => t.name) }, 'Polaris запущен');
+  logger.info({ port: config.port, tools: ctx.tools.all().map((t) => t.name) }, 'ChatGTT запущен');
 
   let stopping = false;
   const shutdown = async (signal: string) => {
@@ -35,6 +35,6 @@ async function main(): Promise<void> {
 }
 
 main().catch((err: unknown) => {
-  console.error('Не удалось запустить Polaris:', err instanceof Error ? err.message : err);
+  console.error('Не удалось запустить ChatGTT:', err instanceof Error ? err.message : err);
   process.exit(1);
 });

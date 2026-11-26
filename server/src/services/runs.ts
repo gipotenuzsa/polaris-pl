@@ -102,7 +102,7 @@ export class RunManager {
       // (Запросы на подтверждение отправляются отдельным уведомлением.)
       if (outcome.status === 'done' && outcome.text.trim() && !this.isBeingViewed(conversationId)) {
         app.push.notify({
-          title: 'Polaris',
+          title: 'ChatGTT',
           body: outcome.text.replace(/\s+/g, ' ').trim(),
           url: `/chat/${conversationId}`,
           tag: `chat-${conversationId}`,

@@ -574,7 +574,7 @@ export function ChatView({ id: initialId }: { id?: string }) {
         {!workspace.sidebarVisible ? (
           <IconButton icon="menu-outline" label="Открыть меню" onPress={workspace.toggleSidebar} />
         ) : null}
-        <Text style={{ color: colors.text, fontSize: 19, fontWeight: '600', letterSpacing: -0.5 }}>Polaris</Text>
+        <Text style={{ color: colors.text, fontSize: 19, fontWeight: '600', letterSpacing: -0.5 }}>ChatGTT</Text>
         <View style={{ flex: 1, minWidth: 0 }}>
           <Text
             numberOfLines={1}
@@ -622,7 +622,7 @@ export function ChatView({ id: initialId }: { id?: string }) {
         {empty ? (
           <View style={{ flex: 1, justifyContent: 'center', paddingBottom: keyboardOpen ? 0 : 72 }}>
             <FadeIn style={{ alignItems: 'center', paddingHorizontal: 24, marginBottom: 23 }}>
-              <Text style={{ color: colors.accent, fontSize: 47, marginBottom: 20 }}>✦</Text>
+              <Image source={require('../assets/icon.png')} style={{ width: 52, height: 52, borderRadius: 14, marginBottom: 20 }} />
               <Text
                 style={{
                   color: colors.text,
@@ -801,7 +801,7 @@ export function ChatView({ id: initialId }: { id?: string }) {
           renderItem={({ item }) => (
             <Pressable accessibilityRole="button" onPress={() => void openHit(item)} style={{ paddingVertical: 12 }}>
               <Text style={{ color: colors.accent, fontSize: 11, marginBottom: 4 }}>
-                {item.role === 'user' ? 'Вы' : 'Polaris'} · {new Date(item.createdAt).toLocaleDateString('ru-RU')}
+                {item.role === 'user' ? 'Вы' : 'ChatGTT'} · {new Date(item.createdAt).toLocaleDateString('ru-RU')}
               </Text>
               <Text numberOfLines={3} style={{ color: colors.text, fontSize: 13, lineHeight: 20 }}>
                 {item.snippet}

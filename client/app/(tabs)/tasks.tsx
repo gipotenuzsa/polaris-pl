@@ -75,7 +75,7 @@ export default function Tasks() {
     <Screen edges={['left', 'right']}>
       <Header
         title="Задачи"
-        subtitle={active ? `Активных: ${active}` : 'Фоновая работа Polaris'}
+        subtitle={active ? `Активных: ${active}` : 'Фоновая работа ChatGTT'}
         actions={[{ icon: 'add', label: 'Новая задача', primary: true, onPress: () => router.push('/task/new') }]}
       />
       {loading && !data ? <Loading /> : null}
@@ -117,7 +117,7 @@ export default function Tasks() {
           !loading ? (
             <Empty
               icon="checkmark-done-circle-outline"
-              text="Задач пока нет. Поставьте цель — Polaris выполнит её сам и пришлёт результат."
+              text="Задач пока нет. Поставьте цель — ChatGTT выполнит её сам и пришлёт результат."
             />
           ) : undefined
         }

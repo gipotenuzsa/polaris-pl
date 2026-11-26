@@ -6,6 +6,7 @@ import {
   Keyboard,
   Modal,
   Platform,
+  Image,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -168,8 +169,8 @@ export function ChatWorkspace({ children }: { children: ReactNode }) {
       style={[s.sidebar, { width: desktop ? 268 : Math.min(310, width - 48) }]}
     >
       <View style={s.brandRow}>
-        <Text style={s.brandStar}>✦</Text>
-        <Text style={s.brand}>Polaris</Text>
+        <Image source={require('../assets/icon.png')} style={{ width: 28, height: 28, borderRadius: 8, marginRight: 9 }} />
+        <Text style={s.brand}>ChatGTT</Text>
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Скрыть боковую панель"
@@ -182,7 +183,7 @@ export function ChatWorkspace({ children }: { children: ReactNode }) {
       <Pressable
         accessibilityRole="button"
         onPress={newChat}
-        style={({ hovered }: HoverState) => [s.newChat, hovered && { backgroundColor: '#A95230' }]}
+        style={({ hovered }: HoverState) => [s.newChat, hovered && { backgroundColor: '#0E8F70' }]}
       >
         <Ionicons name="add" size={21} color={colors.accentText} />
         <Text style={{ color: colors.accentText, fontSize: 14, fontWeight: '600', marginLeft: 9 }}>Новый чат</Text>
@@ -426,7 +427,7 @@ const s = StyleSheet.create({
     gap: 10,
   },
   navText: { fontSize: 13, color: colors.text, flex: 1 },
-  hover: { backgroundColor: '#E7DFCF' },
+  hover: { backgroundColor: '#E5E5E5' },
   badge: { color: colors.accent, fontSize: 11, fontWeight: '600' },
   group: {
     color: colors.muted,
@@ -455,7 +456,7 @@ const s = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: 17,
-    backgroundColor: '#E6D4BF',
+    backgroundColor: '#CDEFE5',
   },
   dialogText: { color: colors.muted, fontSize: 14, lineHeight: 22, marginBottom: space.xl },
 });

@@ -1,4 +1,4 @@
-/* Polaris: service worker для Web Push (PWA). Показывает уведомление и по нажатию открывает нужный экран. */
+/* ChatGTT: service worker для Web Push (PWA). Показывает уведомление и по нажатию открывает нужный экран. */
 self.addEventListener('install', () => self.skipWaiting());
 self.addEventListener('activate', (event) => event.waitUntil(self.clients.claim()));
 
@@ -11,7 +11,7 @@ self.addEventListener('push', (event) => {
   }
   // iOS требует показывать уведомление на каждый push — иначе подписку отзывают
   event.waitUntil(
-    self.registration.showNotification(data.title || 'Polaris', {
+    self.registration.showNotification(data.title || 'ChatGTT', {
       body: data.body || '',
       icon: '/icon-192.png',
       badge: '/icon-192.png',
@@ -48,7 +48,7 @@ self.addEventListener('notificationclick', (event) => {
         } catch {
           /* нет сети — покажем подсказку */
         }
-        await self.registration.showNotification('Polaris', { body: text, icon: '/icon-192.png', tag: 'approval-result' });
+        await self.registration.showNotification('ChatGTT', { body: text, icon: '/icon-192.png', tag: 'approval-result' });
       })(),
     );
     return;

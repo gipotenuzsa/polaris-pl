@@ -1,4 +1,4 @@
--- Polaris: задания pg_cron в Supabase. Выполните вручную в SQL Editor ОДИН раз.
+-- ChatGTT: задания pg_cron в Supabase. Выполните вручную в SQL Editor ОДИН раз.
 -- Заранее: Database → Extensions → включите pg_cron и pg_net.
 --
 -- Замените:

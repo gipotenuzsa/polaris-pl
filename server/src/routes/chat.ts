@@ -108,7 +108,7 @@ export function chatRoutes(app: FastifyInstance, ctx: AppContext): void {
     return { content: last.content };
   });
 
-  /** Поиск по ленте: реплики пользователя и Polaris со сниппетом вокруг совпадения. */
+  /** Поиск по ленте: реплики пользователя и ChatGTT со сниппетом вокруг совпадения. */
   app.get('/api/conversations/:id/search', async (req) => {
     const { id } = parse(idParams, req.params);
     const { q } = parse(z.object({ q: z.string().trim().min(2).max(200) }), req.query);

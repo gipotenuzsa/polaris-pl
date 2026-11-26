@@ -90,7 +90,7 @@ function DataControls() {
           <View>
             <Button title="Удалить все данные" icon="trash-outline" variant="danger" onPress={() => open('all')} />
             <Muted style={{ fontSize: 12, marginTop: 6 }}>
-              Полностью очистить Polaris, включая файлы и подключение ChatGPT.
+              Полностью очистить ChatGTT, включая файлы и подключение ChatGPT.
             </Muted>
           </View>
         </View>
@@ -170,7 +170,7 @@ function ChatGptCard({ status, onChange }: { status: ChatGptStatus; onChange: ()
         <Text style={{ color: colors.warn, fontSize: 13, lineHeight: 19 }}>
           Только для личного использования на своей подписке ChatGPT Plus/Pro. Это неофициальный способ доступа: условия
           OpenAI могут его ограничивать, а интерфейс — меняться без предупреждения. Одна подписка на инстанс. ChatGPT —
-          единственный провайдер моделей в Polaris.
+          единственный провайдер моделей в ChatGTT.
         </Text>
       </View>
 
@@ -562,7 +562,7 @@ function CheckinsForm({ initial, onSaved }: { initial: CheckinsSettings; onSaved
   return (
     <Card>
       <Toggle
-        label="Polaris сам пишет, когда есть повод"
+        label="ChatGTT сам пишет, когда есть повод"
         value={enabled}
         onChange={setEnabled}
         hint="Каждые несколько часов просматривает дела, напоминания и вашу память. Если сообщать нечего — молчит (токены тратятся только на проверку)"
@@ -609,7 +609,7 @@ function CheckinsForm({ initial, onSaved }: { initial: CheckinsSettings; onSaved
               const r = await api.runCheckin();
               notify(
                 r.posted ? 'Есть что сказать' : 'Пока сообщать нечего',
-                r.posted ? 'Сообщение появилось в разговоре.' : 'Polaris проверил дела и решил промолчать.',
+                r.posted ? 'Сообщение появилось в разговоре.' : 'ChatGTT проверил дела и решил промолчать.',
               );
             })
           }
@@ -747,19 +747,19 @@ function PushCard() {
       </Row>
       {state === 'unsupported' ? (
         <Muted>
-          Этот браузер или окно не поддерживает push-уведомления. На iPhone откройте Polaris из иконки на экране
+          Этот браузер или окно не поддерживает push-уведомления. На iPhone откройте ChatGTT из иконки на экране
           «Домой», на Android — в Chrome.
         </Muted>
       ) : null}
       {state === 'needs-install' ? (
         <Body>
           На iPhone push работает только у приложения с экрана «Домой» (iOS 16.4 и новее): в Safari нажмите «Поделиться»
-          → «На экран „Домой“», откройте Polaris с новой иконки и вернитесь в эти настройки.
+          → «На экран „Домой“», откройте ChatGTT с новой иконки и вернитесь в эти настройки.
         </Body>
       ) : null}
       {state === 'denied' ? (
         <Body>
-          Уведомления запрещены. Разрешите их: на iPhone — Настройки → Уведомления → Polaris; в браузере — настройки
+          Уведомления запрещены. Разрешите их: на iPhone — Настройки → Уведомления → ChatGTT; в браузере — настройки
           сайта. Потом вернитесь сюда.
         </Body>
       ) : null}

@@ -1,6 +1,6 @@
 import { FadeIn } from '../src/motion';
 import { useState } from 'react';
-import { KeyboardAvoidingView, Platform, ScrollView, Text, View } from 'react-native';
+import { Image, KeyboardAvoidingView, Platform, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { getBaseUrl, needsServerUrl } from '../src/api';
 import { useAuth } from '../src/auth';
@@ -36,9 +36,9 @@ export default function Login() {
         >
           <View style={{ width: '100%', maxWidth: 420, alignSelf: 'center' }}>
             <FadeIn style={{ alignItems: 'center', marginBottom: space.xl * 1.5 }} distance={14} duration={500}>
-              <Text style={{ color: colors.accent, fontSize: 44 }}>✦</Text>
+              <Image source={require('../assets/icon.png')} style={{ width: 48, height: 48, borderRadius: 13 }} />
               <Text style={{ color: colors.text, fontSize: 34, fontWeight: '600', letterSpacing: -1, marginTop: space.sm }}>
-                Polaris
+                ChatGTT
               </Text>
               <Muted style={{ marginTop: 4 }}>Личный фоновый AI-агент</Muted>
             </FadeIn>

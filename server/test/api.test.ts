@@ -137,14 +137,14 @@ describe('чат', () => {
       method: 'POST',
       url: `/api/conversations/${conversation.id}/messages`,
       headers: h,
-      payload: { content: 'Здравствуй, Polaris' },
+      payload: { content: 'Здравствуй, ChatGTT' },
     });
     expect(post.statusCode).toBe(202);
     await env.ctx.runs.idle();
 
     const got = (await env.app.inject({ url: `/api/conversations/${conversation.id}`, headers: h })).json();
     expect(got.running).toBe(false);
-    expect(got.conversation.title).toBe('Здравствуй, Polaris');
+    expect(got.conversation.title).toBe('Здравствуй, ChatGTT');
     expect(got.messages.map((m: { role: string }) => m.role)).toEqual(['user', 'assistant']);
     expect(got.messages[1]).toMatchObject({ content: 'Привет! Чем помочь?', provider: 'openrouter' });
 
@@ -160,7 +160,7 @@ describe('чат', () => {
     // модель получила системный промпт, историю и список инструментов
     const req = env.provider.calls[0]!;
     expect(req.messages[0]!.role).toBe('system');
-    expect(req.messages.at(-1)).toEqual({ role: 'user', content: 'Здравствуй, Polaris' });
+    expect(req.messages.at(-1)).toEqual({ role: 'user', content: 'Здравствуй, ChatGTT' });
     expect(req.tools!.map((t) => t.name)).toEqual(
       expect.arrayContaining(['memory_save', 'note_create', 'file_write', 'task_create', 'read_url']),
     );

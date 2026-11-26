@@ -133,7 +133,7 @@ function requestOnce(url: URL, opts: SafeFetchOptions): Promise<{ res: http.Inco
       {
         method: 'GET',
         headers: {
-          'user-agent': 'Mozilla/5.0 (compatible; PolarisBot/0.1; +https://github.com/polaris-pl)',
+          'user-agent': 'Mozilla/5.0 (compatible; ChatGTTBot/0.1; +https://github.com/polaris-pl)',
           accept: 'text/html,application/xhtml+xml,application/json,text/plain;q=0.9,*/*;q=0.5',
           'accept-encoding': 'gzip, deflate, br',
           ...opts.headers,

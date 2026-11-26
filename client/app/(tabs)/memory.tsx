@@ -61,7 +61,7 @@ export default function Memory() {
     <Screen edges={['left', 'right']}>
       <Header
         title="Память"
-        subtitle={data?.items.length ? `Записей: ${data.items.length}` : 'Что Polaris помнит о вас'}
+        subtitle={data?.items.length ? `Записей: ${data.items.length}` : 'Что ChatGTT помнит о вас'}
         actions={[
           {
             icon: 'add',
@@ -81,7 +81,7 @@ export default function Memory() {
         ListHeaderComponent={
           <View style={{ marginBottom: space.md }}>
             <Muted style={{ marginBottom: space.sm }}>
-              Это всё, что Polaris помнит о вас между разговорами. Правьте и удаляйте записи свободно.
+              Это всё, что ChatGTT помнит о вас между разговорами. Правьте и удаляйте записи свободно.
             </Muted>
             <TextInput
               value={query}
@@ -105,7 +105,7 @@ export default function Memory() {
           !loading ? (
             <Empty
               icon="bulb-outline"
-              text="Память пуста. Расскажите Polaris о себе в чате или добавьте запись кнопкой ＋."
+              text="Память пуста. Расскажите ChatGTT о себе в чате или добавьте запись кнопкой ＋."
             />
           ) : undefined
         }

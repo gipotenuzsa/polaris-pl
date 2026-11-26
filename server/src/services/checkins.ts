@@ -96,7 +96,7 @@ export class CheckinsService {
       await app.db.query('update conversations set updated_at = now() where id = $1', [main.id]);
       await app.notifications.create({
         kind: 'info',
-        title: 'Polaris',
+        title: 'ChatGTT',
         body: text.slice(0, 300),
         ref: { conversationId: main.id },
       });

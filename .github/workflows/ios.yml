@@ -38,9 +38,9 @@ jobs:
           set -eo pipefail
           APP=$(find build/Build/Products/Release-iphoneos -maxdepth 1 -name '*.app' | head -n1)
           rm -rf Payload && mkdir Payload && cp -R "$APP" Payload/
-          zip -qry Polaris-unsigned.ipa Payload
+          zip -qry ChatGTT-unsigned.ipa Payload
       - uses: actions/upload-artifact@v4
         with:
-          name: Polaris-unsigned-ipa
-          path: client/ios/Polaris-unsigned.ipa
+          name: ChatGTT-unsigned-ipa
+          path: client/ios/ChatGTT-unsigned.ipa
           if-no-files-found: error

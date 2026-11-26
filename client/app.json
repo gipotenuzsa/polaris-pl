@@ -1,17 +1,17 @@
 {
   "expo": {
-    "name": "Polaris",
+    "name": "ChatGTT",
     "slug": "polaris",
     "scheme": "polaris",
     "version": "0.1.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
-    "backgroundColor": "#F5F0E6",
+    "backgroundColor": "#FFFFFF",
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#F5F0E6"
+      "backgroundColor": "#FFFFFF"
     },
     "ios": {
       "bundleIdentifier": "pl.polaris.app",
@@ -24,7 +24,7 @@
       "package": "pl.polaris.app",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#F5F0E6"
+        "backgroundColor": "#3F3F46"
       },
       "softwareKeyboardLayoutMode": "resize"
     },
@@ -32,10 +32,10 @@
       "bundler": "metro",
       "output": "single",
       "favicon": "./assets/favicon.png",
-      "name": "Polaris",
-      "shortName": "Polaris",
-      "backgroundColor": "#F5F0E6",
-      "themeColor": "#F5F0E6"
+      "name": "ChatGTT",
+      "shortName": "ChatGTT",
+      "backgroundColor": "#FFFFFF",
+      "themeColor": "#FFFFFF"
     },
     "plugins": [
       "expo-router",
@@ -45,8 +45,8 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "Polaris использует фото, чтобы вы могли прикрепить их к сообщению.",
-          "cameraPermission": "Polaris использует камеру, чтобы вы могли сфотографировать и отправить снимок."
+          "photosPermission": "ChatGTT использует фото, чтобы вы могли прикрепить их к сообщению.",
+          "cameraPermission": "ChatGTT использует камеру, чтобы вы могли сфотографировать и отправить снимок."
         }
       ]
     ],

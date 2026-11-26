@@ -66,7 +66,7 @@ describe('сквозной сценарий по реальному HTTP', () =>
                           type: 'function',
                           function: {
                             name: 'note_create',
-                            arguments: JSON.stringify({ title: 'Идеи', body: 'проверить Polaris' }),
+                            arguments: JSON.stringify({ title: 'Идеи', body: 'проверить ChatGTT' }),
                           },
                         },
                       ],
@@ -100,7 +100,7 @@ describe('сквозной сценарий по реальному HTTP', () =>
       method: 'POST',
       url: `/api/conversations/${conversation.id}/messages`,
       headers: h,
-      payload: { content: 'Запиши идею: проверить Polaris' },
+      payload: { content: 'Запиши идею: проверить ChatGTT' },
     });
     await env.ctx.runs.idle();
 
@@ -112,7 +112,7 @@ describe('сквозной сценарий по реальному HTTP', () =>
       model: 'local-model',
     });
     expect(await env.ctx.db.query('select title, body from notes')).toEqual([
-      { title: 'Идеи', body: 'проверить Polaris' },
+      { title: 'Идеи', body: 'проверить ChatGTT' },
     ]);
 
     // по проводу ушёл корректный OpenAI-формат с инструментами и результатом вызова
@@ -132,13 +132,13 @@ describe('сквозной сценарий по реальному HTTP', () =>
 
   it('веб-клиент (PWA) раздаётся тем же сервером, API и health не перекрываются', async () => {
     const dir = await mkdtemp(path.join(os.tmpdir(), 'polaris-web-'));
-    await writeFile(path.join(dir, 'index.html'), '<!doctype html><title>Polaris</title><div id="root"></div>');
+    await writeFile(path.join(dir, 'index.html'), '<!doctype html><title>ChatGTT</title><div id="root"></div>');
     await writeFile(path.join(dir, 'app.js'), 'console.log(1)');
     env = await createTestEnv({ config: { WEB_DIR: dir } });
 
     const root = await env.app.inject({ url: '/' });
     expect(root.statusCode).toBe(200);
-    expect(root.body).toContain('<title>Polaris</title>');
+    expect(root.body).toContain('<title>ChatGTT</title>');
     expect((await env.app.inject({ url: '/chat/some-id' })).body).toContain('<div id="root">'); // SPA-маршрут
     expect((await env.app.inject({ url: '/app.js' })).body).toBe('console.log(1)');
     expect((await env.app.inject({ url: '/health' })).json()).toEqual({ ok: true });

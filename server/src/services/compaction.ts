@@ -30,7 +30,7 @@ function transcript(rows: MessageRow[]): string {
     if (r.role === 'user') lines.push(`Пользователь: ${clip(r.content)}`);
     else if (r.role === 'assistant') {
       const calls = r.tool_calls?.length ? ` [вызвал: ${r.tool_calls.map((c) => c.name).join(', ')}]` : '';
-      if (r.content || calls) lines.push(`Polaris: ${clip(r.content)}${calls}`);
+      if (r.content || calls) lines.push(`ChatGTT: ${clip(r.content)}${calls}`);
     } else if (r.role === 'tool') lines.push(`[результат ${r.tool_name ?? 'инструмента'}]: ${clip(r.content)}`);
   }
   return lines.join('\n');

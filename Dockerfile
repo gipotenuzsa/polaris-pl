@@ -1,4 +1,4 @@
-# Polaris: сервер + веб-клиент (PWA) в одном образе. Подходит для Render (free) и любого VPS.
+# ChatGTT: сервер + веб-клиент (PWA) в одном образе. Подходит для Render (free) и любого VPS.
 #   docker build -t polaris .
 #   docker build --build-arg WITH_BROWSER=1 -t polaris .   # с Chromium для инструмента «браузер» (нужно >512 МБ ОЗУ)
 #   docker build --build-arg WITH_WEB=0 -t polaris .       # только API, без веб-клиента

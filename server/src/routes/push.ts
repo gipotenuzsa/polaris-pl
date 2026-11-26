@@ -31,7 +31,7 @@ export function pushRoutes(app: FastifyInstance, ctx: AppContext): void {
     if ((await ctx.push.count()) === 0)
       throw conflict('Нет подписанных устройств: сначала включите уведомления', 'no_subscriptions');
     return ctx.push.send({
-      title: 'Polaris',
+      title: 'ChatGTT',
       body: 'Проверка уведомлений: если вы это видите, всё работает ✦',
       url: '/inbox',
       tag: 'push-test',

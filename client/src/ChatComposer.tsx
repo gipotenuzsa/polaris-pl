@@ -278,7 +278,7 @@ export const ChatComposer = forwardRef<
         ) : null}
         <TextInput
           ref={input}
-          accessibilityLabel="Сообщение Polaris"
+          accessibilityLabel="Сообщение ChatGTT"
           value={text}
           onChangeText={setText}
           placeholder={dragging ? 'Отпустите фото здесь' : 'Спросите что-нибудь…'}
@@ -391,7 +391,7 @@ export const ChatComposer = forwardRef<
         </View>
       ) : null}
       <Text style={{ textAlign: 'center', color: colors.muted, fontSize: 11, paddingTop: 10 }}>
-        Polaris может ошибаться. Проверяйте важную информацию.
+        ChatGTT может ошибаться. Проверяйте важную информацию.
       </Text>
     </View>
   );
