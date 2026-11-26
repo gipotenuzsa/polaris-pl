@@ -6,7 +6,6 @@ import {
   Keyboard,
   Modal,
   Platform,
-  Image,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -45,13 +44,7 @@ export function useChatWorkspace(): WorkspaceValue {
 
 function historyGroup(chat: Conversation): string {
   if (chat.pinned) return 'Закреплённые';
-  const date = new Date(chat.updatedAt);
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const days = Math.floor(
-    (today.getTime() - new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime()) / 86_400_000,
-  );
-  return days <= 0 ? 'Сегодня' : days === 1 ? 'Вчера' : days < 7 ? 'Последние 7 дней' : 'Ранее';
+  return 'Недавние';
 }
 
 export function ChatWorkspace({ children }: { children: ReactNode }) {
@@ -69,6 +62,7 @@ export function ChatWorkspace({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState('');
+  const [searchOpen, setSearchOpen] = useState(false);
   const [menu, setMenu] = useState<{ chat: Conversation; mode: 'menu' | 'rename' | 'delete' } | null>(null);
   const [title, setTitle] = useState('');
   const [busy, setBusy] = useState(false);
@@ -169,53 +163,57 @@ export function ChatWorkspace({ children }: { children: ReactNode }) {
       style={[s.sidebar, { width: desktop ? 268 : Math.min(310, width - 48) }]}
     >
       <View style={s.brandRow}>
-        <Image source={require('../assets/icon.png')} style={{ width: 28, height: 28, borderRadius: 8, marginRight: 9 }} />
         <Text style={s.brand}>ChatGTT</Text>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Поиск чатов"
+          onPress={() => {
+            if (searchOpen) setQuery('');
+            setSearchOpen((v) => !v);
+          }}
+          style={s.iconButton}
+        >
+          <Ionicons name="search-outline" size={19} color={colors.muted} />
+        </Pressable>
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Скрыть боковую панель"
           onPress={() => (desktop ? setCollapsed(true) : setDrawer(false))}
           style={s.iconButton}
         >
-          <Ionicons name="menu-outline" size={20} color={colors.muted} />
+          <Ionicons name="reorder-two-outline" size={21} color={colors.muted} />
         </Pressable>
       </View>
-      <Pressable
-        accessibilityRole="button"
-        onPress={newChat}
-        style={({ hovered }: HoverState) => [s.newChat, hovered && { backgroundColor: '#0E8F70' }]}
-      >
-        <Ionicons name="add" size={21} color={colors.accentText} />
-        <Text style={{ color: colors.accentText, fontSize: 14, fontWeight: '600', marginLeft: 9 }}>Новый чат</Text>
-        <Ionicons name="create-outline" size={17} color={colors.accentText} style={{ marginLeft: 'auto' }} />
-      </Pressable>
-      <View style={s.search}>
-        <Ionicons name="search-outline" size={17} color={colors.muted} />
-        <TextInput
-          accessibilityLabel="Поиск чатов"
-          placeholder="Поиск чатов"
-          placeholderTextColor={colors.muted}
-          value={query}
-          onChangeText={setQuery}
-          style={[s.searchInput, Platform.OS === 'web' && ({ outlineStyle: 'none' } as object)]}
-        />
-        {query ? (
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Очистить поиск"
-            onPress={() => setQuery('')}
-            hitSlop={8}
-          >
-            <Ionicons name="close" size={15} color={colors.muted} />
-          </Pressable>
-        ) : null}
+      {searchOpen ? (
+        <View style={s.search}>
+          <Ionicons name="search-outline" size={17} color={colors.muted} />
+          <TextInput
+            accessibilityLabel="Поиск чатов"
+            placeholder="Поиск чатов"
+            placeholderTextColor={colors.muted}
+            value={query}
+            onChangeText={setQuery}
+            autoFocus
+            style={[s.searchInput, Platform.OS === 'web' && ({ outlineStyle: 'none' } as object)]}
+          />
+        </View>
+      ) : null}
+      <View style={{ paddingHorizontal: 10, marginBottom: 4 }}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Новый чат"
+          onPress={newChat}
+          style={({ hovered }: HoverState) => [s.nav, hovered && s.hover]}
+        >
+          <Ionicons name="create-outline" size={19} color={colors.text} />
+          <Text style={s.navText}>Новый чат</Text>
+        </Pressable>
       </View>
-      <View style={{ paddingHorizontal: 10, marginBottom: 12 }}>
+      <View style={{ paddingHorizontal: 10, marginBottom: 6 }}>
         {navItem('checkbox-outline', 'Задачи', '/tasks', approvals)}
         {navItem('sparkles-outline', 'Память', '/memory')}
         {navItem('folder-outline', 'Файлы и заметки', '/more')}
       </View>
-      <View style={{ height: 1, backgroundColor: colors.border, marginHorizontal: 20 }} />
       <ScrollView
         style={{ flex: 1 }}
         contentContainerStyle={{ padding: 10, paddingTop: 8, paddingBottom: 24 }}
@@ -237,7 +235,7 @@ export function ChatWorkspace({ children }: { children: ReactNode }) {
           return (
             <View key={chat.id}>
               {heading ? <Text style={s.group}>{group}</Text> : null}
-              <View style={[s.chatRow, active && { backgroundColor: colors.userBubble }]}>
+              <View style={[s.chatRow, active && { backgroundColor: '#ECECEC' }]}>
                 <Pressable
                   accessibilityRole="button"
                   accessibilityLabel={`Открыть чат: ${chat.title}`}
@@ -245,7 +243,7 @@ export function ChatWorkspace({ children }: { children: ReactNode }) {
                   onPress={() => navigate(`/chat/${chat.id}`)}
                   style={({ hovered }: HoverState) => [s.chatLink, hovered && !active && s.hover]}
                 >
-                  <Text numberOfLines={1} style={{ color: colors.text, fontSize: 13, lineHeight: 20, flex: 1 }}>
+                  <Text numberOfLines={1} style={{ color: colors.text, fontSize: 14, lineHeight: 20, flex: 1 }}>
                     {chat.title}
                   </Text>
                 </Pressable>
@@ -267,7 +265,7 @@ export function ChatWorkspace({ children }: { children: ReactNode }) {
         {navItem('settings-outline', 'Настройки', '/settings')}
         <View style={s.profile}>
           <View style={s.avatar}>
-            <Text style={{ color: colors.accent, fontWeight: '600', fontSize: 16 }}>P</Text>
+            <Text style={{ color: '#FFFFFF', fontWeight: '600', fontSize: 14 }}>C</Text>
           </View>
           <View style={{ marginLeft: 10 }}>
             <Text style={{ fontSize: 13, fontWeight: '600', color: colors.text }}>Личное пространство</Text>
@@ -301,7 +299,7 @@ export function ChatWorkspace({ children }: { children: ReactNode }) {
       </View>
       {state === 'in' && !desktop ? (
         <Modal visible={drawer} transparent animationType="fade" onRequestClose={() => setDrawer(false)}>
-          <View style={{ flex: 1, flexDirection: 'row', backgroundColor: 'rgba(43,38,32,0.3)' }}>
+          <View style={{ flex: 1, flexDirection: 'row', backgroundColor: 'rgba(0,0,0,0.3)' }}>
             {sidebar}
             <Pressable accessibilityLabel="Закрыть меню" onPress={() => setDrawer(false)} style={{ flex: 1 }} />
           </View>
@@ -392,10 +390,10 @@ export function ChatWorkspace({ children }: { children: ReactNode }) {
 }
 
 const s = StyleSheet.create({
-  sidebar: { height: '100%', backgroundColor: colors.sidebar, borderRightWidth: 1, borderRightColor: colors.border },
-  brandRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingTop: 19, paddingBottom: 23 },
+  sidebar: { height: '100%', backgroundColor: colors.sidebar },
+  brandRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 18, paddingTop: 16, paddingBottom: 12 },
   brandStar: { color: colors.accent, fontSize: 30, marginRight: 9 },
-  brand: { color: colors.text, fontSize: 21, fontWeight: '600', letterSpacing: -0.7, flex: 1 },
+  brand: { color: colors.text, fontSize: 19, fontWeight: '700', letterSpacing: -0.3, flex: 1 },
   iconButton: { width: 30, height: 30, alignItems: 'center', justifyContent: 'center' },
   newChat: {
     marginHorizontal: 16,
@@ -422,25 +420,25 @@ const s = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 11,
-    paddingVertical: 10,
-    borderRadius: 8,
+    paddingVertical: 9,
+    borderRadius: 10,
     gap: 10,
   },
-  navText: { fontSize: 13, color: colors.text, flex: 1 },
-  hover: { backgroundColor: '#E5E5E5' },
+  navText: { fontSize: 14, color: colors.text, flex: 1 },
+  hover: { backgroundColor: '#ECECEC' },
   badge: { color: colors.accent, fontSize: 11, fontWeight: '600' },
   group: {
     color: colors.muted,
-    fontSize: 11,
-    fontWeight: '500',
+    fontSize: 12,
+    fontWeight: '600',
     paddingHorizontal: 11,
-    marginTop: 21,
-    marginBottom: 9,
+    marginTop: 18,
+    marginBottom: 6,
   },
-  chatRow: { flexDirection: 'row', alignItems: 'center', borderRadius: 8, marginBottom: 2, overflow: 'hidden' },
+  chatRow: { flexDirection: 'row', alignItems: 'center', borderRadius: 10, marginBottom: 1, overflow: 'hidden' },
   chatLink: { flex: 1, minWidth: 0, paddingVertical: 10, paddingLeft: 11, paddingRight: 3 },
   chatMenu: { paddingHorizontal: 9, paddingVertical: 11 },
-  bottom: { padding: 10, borderTopWidth: 1, borderTopColor: colors.border },
+  bottom: { padding: 10 },
   profile: {
     marginTop: 12,
     padding: 10,
@@ -456,7 +454,7 @@ const s = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: 17,
-    backgroundColor: '#CDEFE5',
+    backgroundColor: '#8B6B4A',
   },
   dialogText: { color: colors.muted, fontSize: 14, lineHeight: 22, marginBottom: space.xl },
 });

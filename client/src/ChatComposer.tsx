@@ -234,7 +234,7 @@ export const ChatComposer = forwardRef<
             backgroundColor: colors.surface,
             borderWidth: 1,
             borderColor: dragging ? colors.accent : colors.border,
-            borderRadius: 23,
+            borderRadius: 28,
           },
           shadow,
         ]}
@@ -281,7 +281,7 @@ export const ChatComposer = forwardRef<
           accessibilityLabel="Сообщение ChatGTT"
           value={text}
           onChangeText={setText}
-          placeholder={dragging ? 'Отпустите фото здесь' : 'Спросите что-нибудь…'}
+          placeholder={dragging ? 'Отпустите фото здесь' : 'Спросить ChatGTT'}
           placeholderTextColor={colors.muted}
           multiline
           editable={!unavailable}
@@ -340,7 +340,7 @@ export const ChatComposer = forwardRef<
                 {picks.length} / {MAX_PICKS} фото
               </Text>
             ) : (
-              <Text style={{ fontSize: 12, color: colors.muted }}>Фото и изображения</Text>
+              <></>
             )}
           </View>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
@@ -370,7 +370,7 @@ export const ChatComposer = forwardRef<
                 borderRadius: 18,
                 alignItems: 'center',
                 justifyContent: 'center',
-                backgroundColor: enabled || running ? colors.accent : colors.surface2,
+                backgroundColor: enabled || running ? colors.ink : colors.surface2,
               }}
             >
               <Ionicons

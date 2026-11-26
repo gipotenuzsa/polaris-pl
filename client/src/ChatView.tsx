@@ -17,7 +17,7 @@ import { useKeyboardOpen } from './keyboard';
 import { Markdown } from './Markdown';
 import { FadeIn, PressScale, TypingDots } from './motion';
 import { useStatus } from './status';
-import { colors, fonts, radius, space, toolLabel } from './theme';
+import { colors, radius, space, toolLabel } from './theme';
 import type { Approval, Attachment, Message, SearchHit } from './types';
 import { ErrorNote, Loading, type HoverState } from './ui';
 
@@ -622,20 +622,15 @@ export function ChatView({ id: initialId }: { id?: string }) {
         {empty ? (
           <View style={{ flex: 1, justifyContent: 'center', paddingBottom: keyboardOpen ? 0 : 72 }}>
             <FadeIn style={{ alignItems: 'center', paddingHorizontal: 24, marginBottom: 23 }}>
-              <Image source={require('../assets/icon.png')} style={{ width: 52, height: 52, borderRadius: 14, marginBottom: 20 }} />
               <Text
                 style={{
                   color: colors.text,
-                  fontFamily: fonts.serif,
-                  fontSize: 36,
-                  letterSpacing: -1,
+                  fontSize: 28,
+                  letterSpacing: -0.3,
                   textAlign: 'center',
                 }}
               >
-                О чём поговорим?
-              </Text>
-              <Text style={{ color: colors.muted, fontSize: 14, lineHeight: 22, marginTop: 10, textAlign: 'center' }}>
-                Для больших идей и повседневных дел.
+                Привет. Ну что, начнём?
               </Text>
             </FadeIn>
             {composerView}
@@ -660,15 +655,13 @@ export function ChatView({ id: initialId }: { id?: string }) {
                       flexDirection: 'row',
                       alignItems: 'center',
                       gap: 7,
-                      borderWidth: 1,
-                      borderColor: colors.border,
                       borderRadius: 20,
                       paddingHorizontal: 13,
                       paddingVertical: 9,
-                      backgroundColor: hovered ? colors.surface2 : 'transparent',
+                      backgroundColor: hovered ? colors.surface2 : '#F7F7F7',
                     })}
                   >
-                    <Ionicons name={suggestion.icon} size={15} color={colors.accent} />
+                    <Ionicons name={suggestion.icon} size={15} color={colors.muted} />
                     <Text style={{ fontSize: 12, color: colors.muted }}>{suggestion.label}</Text>
                   </Pressable>
                 ))}
