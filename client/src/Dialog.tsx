@@ -22,7 +22,7 @@ export function Dialog({
           justifyContent: 'center',
           alignItems: 'center',
           padding: 20,
-          backgroundColor: 'rgba(43,38,32,0.3)',
+          backgroundColor: colors.overlay,
         }}
       >
         <Pressable accessibilityLabel="Закрыть окно" onPress={onClose} style={{ position: 'absolute', inset: 0 }} />

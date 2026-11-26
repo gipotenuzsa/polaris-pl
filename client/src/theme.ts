@@ -1,4 +1,4 @@
-import { Platform } from 'react-native';
+import { Appearance, Platform } from 'react-native';
 
 /** Шрифт с засечками для заголовков и текста ответов: на iPhone — New York/Georgia, на Android — системный serif. */
 export const fonts = {
@@ -9,8 +9,42 @@ export const fonts = {
   }) as string,
 };
 
-// Палитра ChatGPT: белый фон, светло-серые панели, зелёный акцент #10A37F.
-export const colors = {
+export type ThemePreference = 'system' | 'light' | 'dark';
+const THEME_KEY = 'chatgtt.theme';
+
+/** Выбор темы читается один раз при запуске: на вебе — из localStorage, иначе — по настройке системы. */
+function readPreference(): ThemePreference {
+  try {
+    if (Platform.OS === 'web') {
+      const v = globalThis.localStorage?.getItem(THEME_KEY);
+      if (v === 'light' || v === 'dark') return v;
+    }
+  } catch {
+    /* localStorage недоступен */
+  }
+  return 'system';
+}
+export const themePreference: ThemePreference = readPreference();
+
+function systemDark(): boolean {
+  if (Platform.OS === 'web') return !!globalThis.matchMedia?.('(prefers-color-scheme: dark)').matches;
+  return Appearance.getColorScheme() === 'dark';
+}
+export const isDark = themePreference === 'dark' || (themePreference === 'system' && systemDark());
+
+/** Сохраняет выбор и перезагружает страницу (на телефоне без веба тема следует за системой). */
+export function setThemePreference(value: ThemePreference): void {
+  if (Platform.OS !== 'web') return;
+  try {
+    if (value === 'system') globalThis.localStorage?.removeItem(THEME_KEY);
+    else globalThis.localStorage?.setItem(THEME_KEY, value);
+  } catch {
+    /* ignore */
+  }
+  globalThis.location?.reload();
+}
+
+const light = {
   bg: '#FFFFFF',
   sidebar: '#F9F9F9',
   surface: '#FFFFFF',
@@ -18,11 +52,8 @@ export const colors = {
   border: '#E5E5E5',
   text: '#0D0D0D',
   muted: '#6B6B6B',
-  /** терракота: активные элементы, ссылки, индикаторы */
   accent: '#10A37F',
-  /** «чернила»: основные кнопки и выбранные чипы */
   ink: '#0D0D0D',
-  /** текст на чернильном фоне */
   accentText: '#FFFFFF',
   success: '#10A37F',
   warn: '#B7791F',
@@ -31,7 +62,36 @@ export const colors = {
   danger: '#EF4444',
   dangerBg: '#FEE2E2',
   userBubble: '#F4F4F4',
+  hover: '#ECECEC',
+  chip: '#F7F7F7',
+  overlay: 'rgba(0,0,0,0.3)',
 };
+
+/** Тёмная палитра ChatGPT: графит #212121, боковая панель #171717, поле ввода #2F2F2F. */
+const dark: typeof light = {
+  bg: '#212121',
+  sidebar: '#171717',
+  surface: '#2F2F2F',
+  surface2: '#303030',
+  border: '#3A3A3A',
+  text: '#ECECEC',
+  muted: '#A1A1A1',
+  accent: '#10A37F',
+  ink: '#ECECEC',
+  accentText: '#171717',
+  success: '#34D399',
+  warn: '#F59E0B',
+  warnBg: '#3A2E12',
+  attention: '#F59E0B',
+  danger: '#F87171',
+  dangerBg: '#3B1F1F',
+  userBubble: '#303030',
+  hover: '#2A2A2A',
+  chip: '#2A2A2A',
+  overlay: 'rgba(0,0,0,0.55)',
+};
+
+export const colors = isDark ? dark : light;
 
 export const space = { xs: 4, sm: 8, md: 12, lg: 16, xl: 24 };
 export const radius = { sm: 10, md: 14, lg: 22 };

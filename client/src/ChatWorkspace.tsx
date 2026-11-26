@@ -238,7 +238,7 @@ export function ChatWorkspace({ children }: { children: ReactNode }) {
           return (
             <FadeIn key={chat.id} delay={Math.min(index, 14) * 28} distance={6}>
               {heading ? <Text style={s.group}>{group}</Text> : null}
-              <View style={[s.chatRow, active && { backgroundColor: '#ECECEC' }]}>
+              <View style={[s.chatRow, active && { backgroundColor: colors.hover }]}>
                 <Pressable
                   accessibilityRole="button"
                   accessibilityLabel={`Открыть чат: ${chat.title}`}
@@ -302,7 +302,7 @@ export function ChatWorkspace({ children }: { children: ReactNode }) {
       </View>
       {state === 'in' && !desktop ? (
         <Modal visible={drawer} transparent animationType="fade" onRequestClose={() => setDrawer(false)}>
-          <View style={{ flex: 1, flexDirection: 'row', backgroundColor: 'rgba(0,0,0,0.3)' }}>
+          <View style={{ flex: 1, flexDirection: 'row', backgroundColor: colors.overlay }}>
             {sidebar}
             <Pressable accessibilityLabel="Закрыть меню" onPress={() => setDrawer(false)} style={{ flex: 1 }} />
           </View>
@@ -429,7 +429,7 @@ const s = StyleSheet.create({
     gap: 10,
   },
   navText: { fontSize: 14, color: colors.text, flex: 1 },
-  hover: { backgroundColor: '#ECECEC' },
+  hover: { backgroundColor: colors.hover },
   badge: { color: colors.accent, fontSize: 11, fontWeight: '600' },
   group: {
     color: colors.muted,

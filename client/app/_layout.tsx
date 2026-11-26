@@ -7,7 +7,7 @@ import { AuthProvider, useAuth } from '../src/auth';
 import { ChatWorkspace } from '../src/ChatWorkspace';
 import { registerServiceWorker } from '../src/push';
 import { StatusProvider } from '../src/status';
-import { colors } from '../src/theme';
+import { colors, isDark } from '../src/theme';
 
 /** Пока идёт проверка сессии, поверх навигации показываем заставку. */
 function Gate({ children }: { children: ReactNode }) {
@@ -32,7 +32,7 @@ export default function RootLayout() {
     <SafeAreaProvider>
       <AuthProvider>
         <StatusProvider>
-          <StatusBar style="dark" />
+          <StatusBar style={isDark ? 'light' : 'dark'} />
           <Gate>
             <ChatWorkspace>
               <Stack

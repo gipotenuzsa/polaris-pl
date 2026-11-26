@@ -660,7 +660,7 @@ export function ChatView({ id: initialId }: { id?: string }) {
                       borderRadius: 20,
                       paddingHorizontal: 13,
                       paddingVertical: 9,
-                      backgroundColor: hovered ? colors.surface2 : '#F7F7F7',
+                      backgroundColor: hovered ? colors.surface2 : colors.chip,
                     })}
                   >
                     <Ionicons name={suggestion.icon} size={15} color={colors.muted} />

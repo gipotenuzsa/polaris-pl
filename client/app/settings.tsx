@@ -9,7 +9,7 @@ import { Dialog } from '../src/Dialog';
 import { formatNumber } from '../src/format';
 import { useLoad } from '../src/hooks';
 import { disablePush, enablePush, pushState } from '../src/push';
-import { colors, space } from '../src/theme';
+import { colors, setThemePreference, space, themePreference } from '../src/theme';
 import type { BudgetLimits, BudgetSummary, ChatGptStatus, CheckinsSettings, MorningSettings } from '../src/types';
 import {
   Badge,
@@ -828,6 +828,28 @@ export default function Settings() {
         >
           <ErrorNote message={error} onRetry={refresh} />
           {loading && !data ? <Loading /> : null}
+
+          {Platform.OS === 'web' ? (
+            <>
+              <SectionTitle>Оформление</SectionTitle>
+              <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap', marginBottom: space.lg }}>
+                {(
+                  [
+                    ['system', 'Как в системе'],
+                    ['light', 'Светлая'],
+                    ['dark', 'Тёмная'],
+                  ] as const
+                ).map(([value, label]) => (
+                  <Button
+                    key={value}
+                    title={label}
+                    variant={themePreference === value ? 'primary' : 'secondary'}
+                    onPress={() => setThemePreference(value)}
+                  />
+                ))}
+              </View>
+            </>
+          ) : null}
 
           <SectionTitle>Управление данными</SectionTitle>
           <DataControls />

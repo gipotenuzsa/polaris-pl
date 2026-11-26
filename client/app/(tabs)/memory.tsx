@@ -125,7 +125,7 @@ export default function Memory() {
         )}
       />
       <Modal visible={editing !== null} animationType="slide" transparent onRequestClose={() => setEditing(null)}>
-        <View style={{ flex: 1, backgroundColor: 'rgba(43,38,32,0.35)', justifyContent: 'flex-end' }}>
+        <View style={{ flex: 1, backgroundColor: colors.overlay, justifyContent: 'flex-end' }}>
           <View
             style={{
               backgroundColor: colors.surface,
