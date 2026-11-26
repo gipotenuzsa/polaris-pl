@@ -187,7 +187,7 @@ function ChatGptCard({ status, onChange }: { status: ChatGptStatus; onChange: ()
       />
 
       {status.accounts.map((account, index) => {
-        const limited = account.limitedUntil && Date.parse(account.limitedUntil) > Date.now();
+        const limited = !!account.limitedUntil; // сервер отдаёт limitedUntil только пока лимит действует
         return (
           <Row
             key={account.id}
