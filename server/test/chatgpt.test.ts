@@ -343,6 +343,58 @@ describe('ChatGptAuth и провайдер', () => {
     expect(n).toBe(2);
   });
 
+  it('несколько аккаунтов: при лимите запрос уходит на следующий, повторный вход того же аккаунта не дублирует', async () => {
+    let logins = 0;
+    const seen: string[] = [];
+    await setup({
+      token: () => {
+        const email = logins++ === 1 ? 'two@example.com' : 'me@example.com';
+        return jsonRes({
+          access_token: fakeJwt(inFuture(3600), { email }),
+          refresh_token: `R${logins}`,
+          id_token: fakeJwt(inFuture(3600), { email }),
+        });
+      },
+      responses: (init) => {
+        const auth = String((init.headers as Record<string, string>).authorization);
+        seen.push(auth);
+        // первый аккаунт исчерпал лимит
+        return seen.length === 1
+          ? sseRes([
+              { type: 'response.failed', response: { error: { code: 'usage_limit_reached', message: 'limit' } } },
+            ])
+          : okStream('со второго аккаунта');
+      },
+    });
+    await connect();
+    await connect();
+    expect((await env.ctx.chatgpt.status()).accounts.map((a) => a.email)).toEqual([
+      'me@example.com',
+      'two@example.com',
+    ]);
+    await connect(); // первый аккаунт снова — запись обновляется, а не добавляется
+    expect((await env.ctx.chatgpt.status()).accounts).toHaveLength(2);
+    await env.ctx.chatgpt.setEnabled(true);
+
+    const p = new ChatGptProvider(env.ctx);
+    const res = await p.chat({ messages: [{ role: 'user', content: 'hi' }] });
+    expect(res.content).toBe('со второго аккаунта');
+    expect(seen).toHaveLength(2);
+    expect(seen[0]).not.toBe(seen[1]);
+    const status = await env.ctx.chatgpt.status();
+    expect(status.accounts.find((a) => a.email === 'me@example.com')?.limitedUntil).toBeTruthy();
+
+    // следующий запрос сразу идёт на рабочий аккаунт, без обращения к исчерпанному
+    await p.chat({ messages: [{ role: 'user', content: 'ещё' }] });
+    expect(seen).toHaveLength(3);
+    expect(seen[2]).toBe(seen[1]);
+
+    // отключение одного аккаунта оставляет другой
+    const id = status.accounts.find((a) => a.email === 'two@example.com')!.id;
+    await env.ctx.chatgpt.disconnect(id);
+    expect((await env.ctx.chatgpt.status()).accounts.map((a) => a.email)).toEqual(['me@example.com']);
+  });
+
   it('провайдер доступен только когда включён и подключён; отключение стирает токены', async () => {
     await setup({ token: () => jsonRes({ access_token: fakeJwt(inFuture(3600)), refresh_token: 'R' }) });
     const p = new ChatGptProvider(env.ctx);

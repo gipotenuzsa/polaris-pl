@@ -295,7 +295,7 @@ export const api = {
     post<{ ok: boolean; model: string; error?: string; modelNotFound?: boolean; switchedFrom?: string }>(
       '/api/providers/chatgpt/check',
     ),
-  chatgptDisconnect: () => post<ChatGptStatus>('/api/providers/chatgpt/disconnect'),
+  chatgptDisconnect: (id?: string) => post<ChatGptStatus>('/api/providers/chatgpt/disconnect', id ? { id } : {}),
 
   pushStatus: () => get<{ publicKey: string; subscriptions: number }>('/api/push/status'),
   pushSubscribe: (sub: { endpoint: string; keys: { p256dh: string; auth: string } }) =>

@@ -4,6 +4,9 @@ import { providerFetch } from '../http.js';
 import { ProviderError, type ChatRequest, type ChatResponse, type ModelProvider } from '../types.js';
 import { buildResponsesBody, readResponsesBody } from './responses.js';
 
+const RATE_LIMIT_PAUSE_MS = 15 * 60_000;
+const AUTH_PAUSE_MS = 10 * 60_000;
+
 /**
  * ChatGPT по OAuth-подписке (бэкенд Codex). Личное использование на своей подписке.
  * Неофициальный интерфейс: может измениться без предупреждения — поэтому провайдер всегда последний в цепочке.
@@ -30,14 +33,43 @@ export class ChatGptProvider implements ModelProvider {
     return settings.enabled && (await this.ctx.chatgpt.isConnected());
   }
 
+  /**
+   * Пробует аккаунты по очереди: если у одного кончился лимит (или вход отвалился), запрос целиком уходит на следующий.
+   * Остальные ошибки (модель, сеть, сервер) от аккаунта не зависят, поэтому пробрасываются сразу.
+   */
   async chat(req: ChatRequest): Promise<ChatResponse> {
+    const keys = await this.ctx.chatgpt.order();
+    if (!keys.length) throw new ProviderError('chatgpt', 'auth', 'chatgpt: ChatGPT не подключён', 401);
+    let last: unknown;
+    for (const key of keys) {
+      try {
+        const out = await this.chatWith(key, req);
+        this.ctx.chatgpt.markWorked(key);
+        return out;
+      } catch (err) {
+        last = err;
+        if (err instanceof ProviderError && (err.kind === 'rate_limit' || err.kind === 'auth')) {
+          this.ctx.chatgpt.markLimited(
+            key,
+            err.kind === 'rate_limit' ? (err.retryAfterMs ?? RATE_LIMIT_PAUSE_MS) : AUTH_PAUSE_MS,
+          );
+          this.ctx.log.warn({ kind: err.kind }, 'Аккаунт ChatGPT недоступен, пробую следующий');
+          continue;
+        }
+        throw err;
+      }
+    }
+    throw last;
+  }
+
+  private async chatWith(key: string, req: ChatRequest): Promise<ChatResponse> {
     const cfg = this.ctx.config.providers.chatgpt;
     const model = await this.currentModel();
     const bodyFor = (search: boolean) => JSON.stringify(buildResponsesBody(model, req.messages, req.tools, search));
     let search = cfg.webSearch && !this.searchRejected;
 
     const send = async (forceRefresh: boolean) => {
-      const { accessToken, accountId } = await this.ctx.chatgpt.getAccess(forceRefresh).catch((err: unknown) => {
+      const { accessToken, accountId } = await this.ctx.chatgpt.getAccess(forceRefresh, key).catch((err: unknown) => {
         throw new ProviderError('chatgpt', 'auth', `chatgpt: ${(err as Error).message}`, 401);
       });
       const headers: Record<string, string> = {
@@ -63,7 +95,12 @@ export class ChatGptProvider implements ModelProvider {
       res = await send(false);
     } catch (err) {
       if (err instanceof ProviderError && err.status === 401) res = await send(true);
-      else if (search && err instanceof ProviderError && err.kind === 'bad_request' && /web[_ ]?search|tool/i.test(err.message)) {
+      else if (
+        search &&
+        err instanceof ProviderError &&
+        err.kind === 'bad_request' &&
+        /web[_ ]?search|tool/i.test(err.message)
+      ) {
         // Возможно, бэкенд не принимает web_search: пробуем тот же запрос без него и запоминаем это.
         this.ctx.log.warn({ err: err.message }, 'ChatGPT отверг запрос с web_search, повторяю без встроенного поиска');
         search = false;

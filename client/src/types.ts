@@ -135,9 +135,20 @@ export interface ProviderStatus {
   cooldownUntil?: string;
 }
 
+export interface ChatGptAccount {
+  id: string;
+  accountId?: string;
+  email?: string;
+  plan?: string;
+  expiresAt?: string;
+  /** Лимит исчерпан: до этого времени аккаунт пропускается. */
+  limitedUntil?: string;
+}
+
 export interface ChatGptStatus {
   enabled: boolean;
   connected: boolean;
+  accounts: ChatGptAccount[];
   accountId?: string;
   email?: string;
   plan?: string;

@@ -2,7 +2,13 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { parse } from '../auth/auth.js';
 import type { AppContext } from '../context.js';
-import { agentSchema, budgetSchema, checkinsSchema, chatgptSettingsSchema, morningSchema } from '../services/settings.js';
+import {
+  agentSchema,
+  budgetSchema,
+  checkinsSchema,
+  chatgptSettingsSchema,
+  morningSchema,
+} from '../services/settings.js';
 import { scheduleSchema } from '../tools/tasksTools.js';
 
 const idParams = z.object({ id: z.string().uuid() });
@@ -114,8 +120,9 @@ export function agentRoutes(app: FastifyInstance, ctx: AppContext): void {
 
   app.post('/api/providers/chatgpt/check', async () => ctx.chatgpt.check());
 
-  app.post('/api/providers/chatgpt/disconnect', async () => {
-    await ctx.chatgpt.disconnect();
+  app.post('/api/providers/chatgpt/disconnect', async (req) => {
+    const { id } = parse(z.object({ id: z.string().min(1).max(100).optional() }), req.body ?? {});
+    await ctx.chatgpt.disconnect(id);
     return ctx.chatgpt.status();
   });
 }

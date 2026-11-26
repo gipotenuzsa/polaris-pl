@@ -142,10 +142,10 @@ export async function collectResponse(
       }
       case 'response.failed': {
         const e = json.response?.error;
-        throw ProviderErrorFromBody(e?.code, e?.message);
+        throw ProviderErrorFromBody(e?.code, e?.message, e);
       }
       case 'error':
-        throw ProviderErrorFromBody(json.error?.code ?? json.code, json.error?.message ?? json.message);
+        throw ProviderErrorFromBody(json.error?.code ?? json.code, json.error?.message ?? json.message, json.error);
       default:
         break;
     }
@@ -161,10 +161,16 @@ export async function collectResponse(
   return { content, toolCalls, usage, model };
 }
 
-function ProviderErrorFromBody(code?: string, message?: string): ProviderError {
+/** Бэкенд иногда сообщает, через сколько секунд лимит сбросится (resets_in_seconds). */
+function resetMs(raw: unknown): number | undefined {
+  const v = (raw as { resets_in_seconds?: unknown } | undefined)?.resets_in_seconds;
+  return typeof v === 'number' && Number.isFinite(v) && v > 0 ? v * 1000 : undefined;
+}
+
+function ProviderErrorFromBody(code?: string, message?: string, raw?: unknown): ProviderError {
   const text = `chatgpt: ${code ? `${code} — ` : ''}${message ?? 'ошибка модели'}`;
   if (code === 'rate_limit_exceeded' || code === 'usage_limit_reached')
-    return new ProviderError('chatgpt', 'rate_limit', text, 429);
+    return new ProviderError('chatgpt', 'rate_limit', text, 429, resetMs(raw));
   if (code === 'model_not_found') return new ProviderError('chatgpt', 'bad_request', text, 404);
   if (code === 'server_error') return new ProviderError('chatgpt', 'server', text, 500);
   return new ProviderError('chatgpt', 'bad_request', text);

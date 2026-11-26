@@ -169,8 +169,8 @@ function ChatGptCard({ status, onChange }: { status: ChatGptStatus; onChange: ()
       <View style={{ backgroundColor: colors.warnBg, borderRadius: 8, padding: space.md, marginBottom: space.md }}>
         <Text style={{ color: colors.warn, fontSize: 13, lineHeight: 19 }}>
           Только для личного использования на своей подписке ChatGPT Plus/Pro. Это неофициальный способ доступа: условия
-          OpenAI могут его ограничивать, а интерфейс — меняться без предупреждения. Одна подписка на инстанс. ChatGPT —
-          единственный провайдер моделей в ChatGTT.
+          OpenAI могут его ограничивать, а интерфейс — меняться без предупреждения. Можно подключить несколько аккаунтов: когда
+          у одного кончится лимит, ChatGTT сам перейдёт на следующий и продолжит работу.
         </Text>
       </View>
 
@@ -186,17 +186,62 @@ function ChatGptCard({ status, onChange }: { status: ChatGptStatus; onChange: ()
         hint={status.connected ? undefined : 'Сначала подключите аккаунт'}
       />
 
-      {status.connected ? (
+      {status.accounts.map((account, index) => {
+        const limited = account.limitedUntil && Date.parse(account.limitedUntil) > Date.now();
+        return (
+          <Row
+            key={account.id}
+            style={{
+              justifyContent: 'space-between',
+              paddingVertical: space.sm,
+              borderTopWidth: index ? 1 : 0,
+              borderTopColor: colors.border,
+            }}
+          >
+            <View style={{ flex: 1, minWidth: 0, marginRight: space.sm }}>
+              <Text numberOfLines={1} style={{ color: colors.text, fontSize: 14, fontWeight: '600' }}>
+                {account.email ?? 'аккаунт подключён'}
+              </Text>
+              <Muted>
+                {account.plan ? `план ${account.plan}` : 'ChatGPT'}
+                {limited
+                  ? ` · лимит, снова с ${new Date(account.limitedUntil!).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}`
+                  : ' · готов'}
+              </Muted>
+            </View>
+            <Button
+              title="Убрать"
+              variant="ghost"
+              loading={busy === `remove-${account.id}`}
+              onPress={async () => {
+                if (
+                  await confirmAction(
+                    'Убрать аккаунт?',
+                    `${account.email ?? 'Аккаунт'}: токены будут удалены с сервера.`,
+                    'Убрать',
+                  )
+                ) {
+                  await run(`remove-${account.id}`, async () => {
+                    await api.chatgptDisconnect(account.id);
+                    setCheck(null);
+                    onChange();
+                  });
+                }
+              }}
+            />
+          </Row>
+        );
+      })}
+      {status.accounts.length > 1 ? (
         <Muted style={{ marginBottom: space.md }}>
-          {status.email ?? 'аккаунт подключён'}
-          {status.plan ? ` · план ${status.plan}` : ''}
+          Запросы идут на первый свободный аккаунт. Если лимит исчерпан, подключается следующий.
         </Muted>
       ) : null}
 
       {!flow ? (
         <Row style={{ flexWrap: 'wrap' }}>
           <Button
-            title={status.connected ? 'Переподключить' : 'Подключить ChatGPT'}
+            title={status.connected ? 'Добавить аккаунт' : 'Подключить ChatGPT'}
             icon="log-in-outline"
             loading={busy === 'connect'}
             onPress={() => run('connect', async () => setFlow(await api.chatgptConnect()))}
@@ -212,7 +257,7 @@ function ChatGptCard({ status, onChange }: { status: ChatGptStatus; onChange: ()
           />
           {status.connected ? (
             <Button
-              title="Отключить"
+              title="Отключить все"
               variant="ghost"
               loading={busy === 'disconnect'}
               onPress={async () => {
@@ -230,7 +275,10 @@ function ChatGptCard({ status, onChange }: { status: ChatGptStatus; onChange: ()
         </Row>
       ) : (
         <View>
-          <Body>1. Откройте ссылку и войдите в ChatGPT.</Body>
+          <Body>
+            1. Откройте ссылку и войдите в ChatGPT. Для ещё одного аккаунта откройте ссылку в режиме инкогнито или другом
+            браузере, иначе ChatGPT войдёт в уже открытый аккаунт.
+          </Body>
           <Row style={{ marginVertical: space.sm, flexWrap: 'wrap' }}>
             <Button
               title="Открыть вход"
