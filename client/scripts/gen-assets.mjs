@@ -73,7 +73,7 @@ function knot(u, v, scale) {
 function icon({ background, radius }) {
   return (u, v) => {
     const k = knot(u, v, radius / 0.32 * 0.95);
-    const bg = background ? [63, 63, 70] : [0, 0, 0];
+    const bg = background ? [23, 23, 23] : [0, 0, 0];
     const white = [255, 255, 255];
     const a = background ? 255 : Math.round(k * 255);
     const c = background ? bg.map((b, i) => mix(b, white[i], k)) : white;

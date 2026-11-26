@@ -633,7 +633,9 @@ export function ChatView({ id: initialId }: { id?: string }) {
                 Привет. Ну что, начнём?
               </Text>
             </FadeIn>
-            {composerView}
+            <FadeIn delay={120} distance={14} duration={380}>
+              {composerView}
+            </FadeIn>
             {!keyboardOpen ? (
               <View
                 style={{
@@ -646,9 +648,9 @@ export function ChatView({ id: initialId }: { id?: string }) {
                   paddingTop: 15,
                 }}
               >
-                {SUGGESTIONS.map((suggestion) => (
+                {SUGGESTIONS.map((suggestion, i) => (
+                  <FadeIn key={suggestion.label} delay={320 + i * 70}>
                   <Pressable
-                    key={suggestion.label}
                     accessibilityRole="button"
                     onPress={() => composer.current?.setText(suggestion.prompt)}
                     style={({ hovered }: HoverState) => ({
@@ -664,6 +666,7 @@ export function ChatView({ id: initialId }: { id?: string }) {
                     <Ionicons name={suggestion.icon} size={15} color={colors.muted} />
                     <Text style={{ fontSize: 12, color: colors.muted }}>{suggestion.label}</Text>
                   </Pressable>
+                  </FadeIn>
                 ))}
               </View>
             ) : null}

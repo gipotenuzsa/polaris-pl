@@ -24,7 +24,7 @@
       "package": "pl.polaris.app",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#3F3F46"
+        "backgroundColor": "#171717"
       },
       "softwareKeyboardLayoutMode": "resize"
     },

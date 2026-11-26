@@ -12,6 +12,7 @@ import {
   type TextInputInstance,
 } from 'react-native';
 import { MAX_PICKS, pickImages, picksFromFiles, previewUri, type Picked } from './attachments';
+import { PressScale } from './motion';
 import { PhotoPicker } from './PhotoPicker';
 import { colors, shadow } from './theme';
 
@@ -359,7 +360,8 @@ export const ChatComposer = forwardRef<
                 />
               </Pressable>
             ) : null}
-            <Pressable
+            <PressScale
+              scale={0.88}
               accessibilityRole="button"
               accessibilityLabel={running ? 'Остановить' : 'Отправить'}
               disabled={!enabled && !running}
@@ -378,7 +380,7 @@ export const ChatComposer = forwardRef<
                 size={19}
                 color={enabled || running ? colors.accentText : colors.muted}
               />
-            </Pressable>
+            </PressScale>
           </View>
         </View>
       </View>

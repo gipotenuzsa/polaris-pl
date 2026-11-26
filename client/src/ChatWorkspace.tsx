@@ -6,6 +6,7 @@ import {
   Keyboard,
   Modal,
   Platform,
+  Image,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -21,6 +22,7 @@ import { Dialog } from './Dialog';
 import { useStatus } from './status';
 import { colors, space } from './theme';
 import type { Conversation } from './types';
+import { FadeIn } from './motion';
 import { Button, ErrorNote, Input, type HoverState, type IconName } from './ui';
 
 interface WorkspaceValue {
@@ -163,6 +165,7 @@ export function ChatWorkspace({ children }: { children: ReactNode }) {
       style={[s.sidebar, { width: desktop ? 268 : Math.min(310, width - 48) }]}
     >
       <View style={s.brandRow}>
+        <Image source={require('../assets/icon.png')} style={s.logo} />
         <Text style={s.brand}>ChatGTT</Text>
         <Pressable
           accessibilityRole="button"
@@ -233,7 +236,7 @@ export function ChatWorkspace({ children }: { children: ReactNode }) {
           const heading = !index || historyGroup(filtered[index - 1]!) !== group;
           const active = pathname === `/chat/${chat.id}`;
           return (
-            <View key={chat.id}>
+            <FadeIn key={chat.id} delay={Math.min(index, 14) * 28} distance={6}>
               {heading ? <Text style={s.group}>{group}</Text> : null}
               <View style={[s.chatRow, active && { backgroundColor: '#ECECEC' }]}>
                 <Pressable
@@ -256,7 +259,7 @@ export function ChatWorkspace({ children }: { children: ReactNode }) {
                   <Ionicons name="ellipsis-horizontal" size={17} color={colors.muted} />
                 </Pressable>
               </View>
-            </View>
+            </FadeIn>
           );
         })}
       </ScrollView>
@@ -393,6 +396,7 @@ const s = StyleSheet.create({
   sidebar: { height: '100%', backgroundColor: colors.sidebar },
   brandRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 18, paddingTop: 16, paddingBottom: 12 },
   brandStar: { color: colors.accent, fontSize: 30, marginRight: 9 },
+  logo: { width: 30, height: 30, borderRadius: 9, marginRight: 10 },
   brand: { color: colors.text, fontSize: 19, fontWeight: '700', letterSpacing: -0.3, flex: 1 },
   iconButton: { width: 30, height: 30, alignItems: 'center', justifyContent: 'center' },
   newChat: {
