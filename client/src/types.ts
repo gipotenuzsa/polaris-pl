@@ -5,8 +5,19 @@ export interface Conversation {
   title: string;
   kind: 'chat' | 'task' | 'summary';
   pinned: boolean;
+  /** Проект, в котором лежит чат */
+  projectId?: string;
   /** Начало последнего сообщения */
   preview?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Project {
+  id: string;
+  name: string;
+  instructions: string;
+  chatCount: number;
   createdAt: string;
   updatedAt: string;
 }

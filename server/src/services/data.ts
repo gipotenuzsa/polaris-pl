@@ -93,6 +93,7 @@ export class DataService {
           'attachments',
           'messages',
           'conversations',
+          'projects',
           'memory',
           'notes',
           'reminders',

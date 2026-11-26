@@ -9,6 +9,7 @@ import type { BudgetService } from './services/budget.js';
 import type { CheckinsService } from './services/checkins.js';
 import type { CompactionService } from './services/compaction.js';
 import type { ConversationService } from './services/conversations.js';
+import type { ProjectService } from './services/projects.js';
 import type { DataService } from './services/data.js';
 import type { MemoryService } from './services/memory.js';
 import type { MorningService } from './services/morning.js';
@@ -48,6 +49,7 @@ export interface AppContext {
   notifications: NotificationsService;
   push: PushService;
   conversations: ConversationService;
+  projects: ProjectService;
   data: DataService;
   compaction: CompactionService;
   backup: BackupService;

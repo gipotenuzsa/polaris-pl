@@ -24,7 +24,10 @@ const TASK = `
 const MORNING = `
 Режим утренней сводки. Составь короткую дружелюбную сводку на день по данным ниже и предпочтениям пользователя из памяти (если в памяти есть интересующие его темы — можешь выполнить 1–2 веб-поиска за свежими новостями). Структура: главное на сегодня, задачи и напоминания, итоги фоновых задач, при необходимости — новости по интересам. Не более 12 строк. Не задавай вопросов.`;
 
-export async function buildSystemPrompt(app: AppContext, opts: { mode: PromptMode; query?: string }): Promise<string> {
+export async function buildSystemPrompt(
+  app: AppContext,
+  opts: { mode: PromptMode; query?: string; project?: { name: string; instructions: string } | null },
+): Promise<string> {
   const now = app.clock();
   const tz = app.config.timezone;
   const when = new Intl.DateTimeFormat('ru-RU', { timeZone: tz, dateStyle: 'full', timeStyle: 'short' }).format(now);
@@ -43,6 +46,13 @@ export async function buildSystemPrompt(app: AppContext, opts: { mode: PromptMod
 
   const custom = (await app.settings.getAgent()).instructions.trim();
   if (custom) parts.push(`\nДополнительные инструкции владельца:\n${custom}`);
+
+  const project = opts.project;
+  if (project?.instructions.trim()) {
+    parts.push(
+      `\nИнструкции проекта «${project.name}» (этот чат лежит в нём; следуй им):\n${project.instructions.trim()}`,
+    );
+  }
 
   return parts.join('\n');
 }

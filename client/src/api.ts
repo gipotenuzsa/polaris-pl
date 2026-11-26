@@ -15,6 +15,7 @@ import type {
   Message,
   MorningSettings,
   Note,
+  Project,
   ProviderStatus,
   Schedule,
   SearchHit,
@@ -206,7 +207,16 @@ export const api = {
 
   conversations: (kind: Conversation['kind'] = 'chat') =>
     get<{ conversations: Conversation[] }>(`/api/conversations${q({ kind })}`),
-  createConversation: () => post<{ conversation: Conversation }>('/api/conversations'),
+  createConversation: (projectId?: string) =>
+    post<{ conversation: Conversation }>('/api/conversations', projectId ? { projectId } : {}),
+  moveConversation: (id: string, projectId: string | null) =>
+    patch<{ ok: true }>(`/api/conversations/${id}`, { projectId }),
+  projects: () => get<{ projects: Project[] }>('/api/projects'),
+  createProject: (name: string, instructions: string) =>
+    post<{ project: Project }>('/api/projects', { name, instructions }),
+  updateProject: (id: string, body: { name?: string; instructions?: string }) =>
+    patch<{ project: Project }>(`/api/projects/${id}`, body),
+  deleteProject: (id: string) => del<{ ok: true }>(`/api/projects/${id}`),
   main: () => get<{ conversation: Conversation }>('/api/main'),
   conversation: (id: string, opts: { after?: number; limit?: number; before?: number } = {}) =>
     get<{

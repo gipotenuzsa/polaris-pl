@@ -11,6 +11,7 @@ import { badRequest } from '../util/errors.js';
 
 /** Порядок важен: сначала родители, потом зависимые таблицы. */
 const TABLES = [
+  { name: 'projects', order: 'created_at' },
   { name: 'conversations', order: 'created_at' },
   { name: 'messages', order: 'seq', identity: 'seq' },
   { name: 'attachments', order: 'created_at', batch: 10 },
@@ -72,7 +73,11 @@ export class BackupService {
         const rows = (f.tables as Record<string, unknown>)[t.name];
         if (rows === undefined) continue;
         if (!Array.isArray(rows)) throw badRequest(`Таблица ${t.name} в копии повреждена`);
-        const list = (t.name === 'settings' ? rows.filter((r) => !SKIP_SETTINGS.includes(String((r as { key?: string }).key))) : rows) as unknown[];
+        const list = (
+          t.name === 'settings'
+            ? rows.filter((r) => !SKIP_SETTINGS.includes(String((r as { key?: string }).key)))
+            : rows
+        ) as unknown[];
         const size = 'batch' in t ? t.batch : 200;
         const known = new Set(
           (

@@ -47,8 +47,12 @@ export function chatRoutes(app: FastifyInstance, ctx: AppContext): void {
   });
 
   app.post('/api/conversations', async (req) => {
-    const { title } = parse(z.object({ title: z.string().max(200).optional() }), req.body ?? {});
-    return { conversation: await ctx.conversations.create(title || 'Новый чат') };
+    const { title, projectId } = parse(
+      z.object({ title: z.string().max(200).optional(), projectId: z.string().uuid().optional() }),
+      req.body ?? {},
+    );
+    if (projectId) await ctx.projects.get(projectId);
+    return { conversation: await ctx.conversations.create(title || 'Новый чат', 'chat', projectId ?? null) };
   });
 
   // Единый сквозной разговор — главный экран приложения.
@@ -132,15 +136,51 @@ export function chatRoutes(app: FastifyInstance, ctx: AppContext): void {
 
   app.patch('/api/conversations/:id', async (req) => {
     const { id } = parse(idParams, req.params);
-    const { title, pinned } = parse(
+    const { title, pinned, projectId } = parse(
       z
-        .object({ title: z.string().trim().min(1).max(200).optional(), pinned: z.boolean().optional() })
-        .refine((b) => b.title !== undefined || b.pinned !== undefined, { message: 'Нечего менять' }),
+        .object({
+          title: z.string().trim().min(1).max(200).optional(),
+          pinned: z.boolean().optional(),
+          projectId: z.string().uuid().nullable().optional(),
+        })
+        .refine((b) => b.title !== undefined || b.pinned !== undefined || b.projectId !== undefined, {
+          message: 'Нечего менять',
+        }),
       req.body,
     );
     await ctx.conversations.get(id);
     if (title !== undefined) await ctx.conversations.rename(id, title);
     if (pinned !== undefined) await ctx.conversations.setPinned(id, pinned);
+    if (projectId !== undefined) await ctx.conversations.setProject(id, projectId);
+    return { ok: true };
+  });
+
+  // ── Проекты ───────────────────────────────────────────────────────────────
+  app.get('/api/projects', async () => ({ projects: await ctx.projects.list() }));
+
+  app.post('/api/projects', async (req) => {
+    const { name, instructions } = parse(
+      z.object({ name: z.string().trim().min(1).max(120), instructions: z.string().max(8000).optional() }),
+      req.body,
+    );
+    return { project: await ctx.projects.create(name, instructions) };
+  });
+
+  app.patch('/api/projects/:id', async (req) => {
+    const { id } = parse(idParams, req.params);
+    const patch = parse(
+      z
+        .object({ name: z.string().trim().min(1).max(120).optional(), instructions: z.string().max(8000).optional() })
+        .refine((b) => b.name !== undefined || b.instructions !== undefined, { message: 'Нечего менять' }),
+      req.body,
+    );
+    await ctx.projects.update(id, patch);
+    return { project: await ctx.projects.get(id) };
+  });
+
+  app.delete('/api/projects/:id', async (req) => {
+    const { id } = parse(idParams, req.params);
+    await ctx.projects.remove(id);
     return { ok: true };
   });
 

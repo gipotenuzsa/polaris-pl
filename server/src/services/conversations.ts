@@ -13,6 +13,7 @@ interface ConversationRow {
   kind: ConversationKind;
   pinned: boolean;
   is_main: boolean;
+  project_id: string | null;
   summary: string;
   summary_upto: number;
   preview?: string | null;
@@ -43,6 +44,8 @@ export interface ConversationDto {
   pinned: boolean;
   /** Единый сквозной разговор (главный экран) */
   isMain: boolean;
+  /** Проект, в котором лежит чат */
+  projectId?: string;
   /** Начало последнего сообщения — для списка чатов */
   preview?: string;
   createdAt: string;
@@ -82,6 +85,7 @@ export const toConversationDto = (r: ConversationRow): ConversationDto => ({
   kind: r.kind,
   pinned: r.pinned,
   isMain: r.is_main,
+  projectId: r.project_id ?? undefined,
   preview: r.preview?.trim() || undefined,
   createdAt: iso(r.created_at),
   updatedAt: iso(r.updated_at),
@@ -144,10 +148,14 @@ export interface NewMessage {
 export class ConversationService {
   constructor(private readonly ctx: AppContext) {}
 
-  async create(title = 'Новый чат', kind: ConversationKind = 'chat'): Promise<ConversationDto> {
+  async create(
+    title = 'Новый чат',
+    kind: ConversationKind = 'chat',
+    projectId: string | null = null,
+  ): Promise<ConversationDto> {
     const rows = await this.ctx.db.query<ConversationRow>(
-      'insert into conversations (title, kind) values ($1, $2) returning *',
-      [title.slice(0, 200), kind],
+      'insert into conversations (title, kind, project_id) values ($1, $2, $3) returning *',
+      [title.slice(0, 200), kind, projectId],
     );
     return toConversationDto(rows[0]!);
   }
@@ -243,6 +251,12 @@ export class ConversationService {
 
   async setPinned(id: string, pinned: boolean): Promise<void> {
     await this.ctx.db.query('update conversations set pinned = $2 where id = $1', [id, pinned]);
+  }
+
+  /** Переносит чат в проект или (null) убирает из проекта. */
+  async setProject(id: string, projectId: string | null): Promise<void> {
+    if (projectId) await this.ctx.projects.get(projectId);
+    await this.ctx.db.query('update conversations set project_id = $2 where id = $1', [id, projectId]);
   }
 
   async rename(id: string, title: string): Promise<void> {

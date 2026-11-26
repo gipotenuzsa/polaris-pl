@@ -2,7 +2,18 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
 import { useRouter } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { FlatList, Image, KeyboardAvoidingView, Modal, Platform, Pressable, Text, TextInput, View } from 'react-native';
+import {
+  FlatList,
+  Image,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  Pressable,
+  Text,
+  TextInput,
+  View,
+  useWindowDimensions,
+} from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { api, attachmentSource } from './api';
 import { ApprovalCard } from './ApprovalCard';
@@ -336,6 +347,7 @@ export function ChatView({ id: initialId }: { id?: string }) {
   const [sending, setSending] = useState(false);
   const status = useLoad(() => api.status(), 30_000);
   const keyboardOpen = useKeyboardOpen();
+  const compact = useWindowDimensions().width < 900;
   const { data, error, loading, refresh } = useLoad(
     async () => {
       if (!id)
@@ -517,7 +529,7 @@ export function ChatView({ id: initialId }: { id?: string }) {
         }
         attachmentIds.push(attachmentId);
       }
-      const target = id ?? (await api.createConversation()).conversation.id;
+      const target = id ?? (await api.createConversation(workspace.draftProjectId ?? undefined)).conversation.id;
       if (!id) setId(target);
       await api.sendMessage(target, content, attachmentIds);
       uploaded.current.clear();
@@ -557,6 +569,41 @@ export function ChatView({ id: initialId }: { id?: string }) {
       onStop={() => void stop()}
       draft={!initialId}
     />
+  );
+
+  const suggestionsView = keyboardOpen ? null : (
+    <View
+      style={{
+        ...WIDE,
+        flexDirection: 'row',
+        justifyContent: 'center',
+        flexWrap: 'wrap',
+        gap: 8,
+        paddingHorizontal: 24,
+        paddingTop: 15,
+      }}
+    >
+      {SUGGESTIONS.map((suggestion, i) => (
+        <FadeIn key={suggestion.label} delay={320 + i * 70}>
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => composer.current?.setText(suggestion.prompt)}
+            style={({ hovered }: HoverState) => ({
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 7,
+              borderRadius: 20,
+              paddingHorizontal: 13,
+              paddingVertical: 9,
+              backgroundColor: hovered ? colors.surface2 : colors.chip,
+            })}
+          >
+            <Ionicons name={suggestion.icon} size={15} color={colors.muted} />
+            <Text style={{ fontSize: 12, color: colors.muted }}>{suggestion.label}</Text>
+          </Pressable>
+        </FadeIn>
+      ))}
+    </View>
   );
 
   return (
@@ -620,8 +667,16 @@ export function ChatView({ id: initialId }: { id?: string }) {
           </View>
         ) : null}
         {empty ? (
-          <View style={{ flex: 1, justifyContent: 'center', paddingBottom: keyboardOpen ? 0 : 72 }}>
-            <FadeIn style={{ alignItems: 'center', paddingHorizontal: 24, marginBottom: 23 }}>
+          <View
+            style={compact ? { flex: 1 } : { flex: 1, justifyContent: 'center', paddingBottom: keyboardOpen ? 0 : 72 }}
+          >
+            <FadeIn
+              style={
+                compact
+                  ? { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 24 }
+                  : { alignItems: 'center', paddingHorizontal: 24, marginBottom: 23 }
+              }
+            >
               <Text
                 style={{
                   color: colors.text,
@@ -633,43 +688,11 @@ export function ChatView({ id: initialId }: { id?: string }) {
                 Привет. Ну что, начнём?
               </Text>
             </FadeIn>
+            {compact ? suggestionsView : null}
             <FadeIn delay={120} distance={14} duration={380}>
               {composerView}
             </FadeIn>
-            {!keyboardOpen ? (
-              <View
-                style={{
-                  ...WIDE,
-                  flexDirection: 'row',
-                  justifyContent: 'center',
-                  flexWrap: 'wrap',
-                  gap: 8,
-                  paddingHorizontal: 24,
-                  paddingTop: 15,
-                }}
-              >
-                {SUGGESTIONS.map((suggestion, i) => (
-                  <FadeIn key={suggestion.label} delay={320 + i * 70}>
-                  <Pressable
-                    accessibilityRole="button"
-                    onPress={() => composer.current?.setText(suggestion.prompt)}
-                    style={({ hovered }: HoverState) => ({
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      gap: 7,
-                      borderRadius: 20,
-                      paddingHorizontal: 13,
-                      paddingVertical: 9,
-                      backgroundColor: hovered ? colors.surface2 : colors.chip,
-                    })}
-                  >
-                    <Ionicons name={suggestion.icon} size={15} color={colors.muted} />
-                    <Text style={{ fontSize: 12, color: colors.muted }}>{suggestion.label}</Text>
-                  </Pressable>
-                  </FadeIn>
-                ))}
-              </View>
-            ) : null}
+            {!compact ? suggestionsView : null}
           </View>
         ) : (
           <>

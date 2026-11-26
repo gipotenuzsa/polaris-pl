@@ -87,7 +87,8 @@ export class RunManager {
     const app = this.ctx;
     const rows = await app.conversations.messages(conversationId, 0, 400);
     const lastUser = [...rows].reverse().find((r) => r.role === 'user');
-    const system = await buildSystemPrompt(app, { mode: 'chat', query: lastUser?.content });
+    const project = await app.projects.forConversation(conversationId);
+    const system = await buildSystemPrompt(app, { mode: 'chat', query: lastUser?.content, project });
     try {
       const outcome = await runAgent(app, {
         conversationId,

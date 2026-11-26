@@ -15,6 +15,7 @@ import { BudgetService } from './services/budget.js';
 import { CheckinsService } from './services/checkins.js';
 import { CompactionService } from './services/compaction.js';
 import { ConversationService } from './services/conversations.js';
+import { ProjectService } from './services/projects.js';
 import { DataService } from './services/data.js';
 import { MemoryService } from './services/memory.js';
 import { MorningService } from './services/morning.js';
@@ -90,6 +91,7 @@ export async function createContext(opts: BootstrapOptions): Promise<AppContext>
   ctx.notifications = new NotificationsService(ctx);
   ctx.push = new PushService(ctx, opts.pushSender);
   ctx.conversations = new ConversationService(ctx);
+  ctx.projects = new ProjectService(ctx);
   ctx.compaction = new CompactionService(ctx);
   ctx.backup = new BackupService(ctx);
   ctx.checkins = new CheckinsService(ctx);
